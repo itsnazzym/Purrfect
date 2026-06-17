@@ -1,4 +1,4 @@
-package me.eternal.purrfect.ui.manager.pages.themes.aphelion
+package me.eternal.purrfect.ui.manager.pages.social.themes
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -39,18 +39,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavBackStackEntry
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.eternal.purrfect.R
 import me.eternal.purrfect.common.data.SocialScope
 import me.eternal.purrfect.ui.manager.pages.social.SocialRootSection
-import me.eternal.purrfect.ui.manager.pages.social.sortSocialFriends
-import me.eternal.purrfect.ui.manager.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
-    // Controller handles data loading and synchronization
+fun SocialRootSection.AphelionSocialContent(nav: NavBackStackEntry) {
     SocialDataController()
 
     val titles = remember {
@@ -62,8 +59,6 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
     var searchActive by rememberSaveable { mutableStateOf(false) }
 
     val normalizedQuery = remember(searchQuery) { searchQuery.trim() }
-    
-    // Filter logic based on the parent's synchronized data lists
     val filteredFriends = remember(friendList, normalizedQuery) {
         if (normalizedQuery.isBlank()) {
             friendList
@@ -85,7 +80,7 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PurrfectPalette.backgroundGradient)
+            .background(LocalPurrfectSkin.current.backgroundGradient)
     ) {
         SocialHeader(
             titles = titles,
@@ -106,8 +101,8 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
             val searchShape = RoundedCornerShape(18.dp)
             val searchBorder = Brush.linearGradient(
                 listOf(
-                    PurrfectPalette.glowPrimary.copy(alpha = 0.45f),
-                    PurrfectPalette.glowSecondary.copy(alpha = 0.35f)
+                    LocalPurrfectSkin.current.glowPrimary.copy(alpha = 0.45f),
+                    LocalPurrfectSkin.current.glowSecondary.copy(alpha = 0.35f)
                 )
             )
             Surface(
@@ -115,7 +110,7 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                 shape = searchShape,
-                color = Color.White.copy(alpha = 0.05f),
+                color = LocalPurrfectSkin.current.textPrimary.copy(alpha = 0.05f),
                 border = BorderStroke(1.dp, searchBorder),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp
@@ -123,7 +118,7 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(PurrfectPalette.cardOverlay, searchShape)
+                        .background(LocalPurrfectSkin.current.cardOverlay, searchShape)
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -131,23 +126,23 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = searchHint,
-                        tint = PurrfectPalette.textSecondary
+                        tint = LocalPurrfectSkin.current.textSecondary
                     )
                     BasicTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            color = Color.White,
+                            color = LocalPurrfectSkin.current.textPrimary,
                             fontSize = 15.sp
                         ),
-                        cursorBrush = SolidColor(PurrfectPalette.glowSecondary),
+                        cursorBrush = SolidColor(LocalPurrfectSkin.current.glowSecondary),
                         modifier = Modifier.weight(1f)
                     ) { innerTextField ->
                         if (searchQuery.isEmpty()) {
                             Text(
                                 text = searchHint,
-                                color = PurrfectPalette.textSecondary,
+                                color = LocalPurrfectSkin.current.textSecondary,
                                 fontSize = 14.sp
                             )
                         }
@@ -158,7 +153,7 @@ fun SocialRootSection.AphelionSocialScreen(nav: NavBackStackEntry) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
                                 contentDescription = translation["clear_search_button_description"] ?: "Clear",
-                                tint = Color.White
+                                tint = LocalPurrfectSkin.current.textPrimary
                             )
                         }
                     }

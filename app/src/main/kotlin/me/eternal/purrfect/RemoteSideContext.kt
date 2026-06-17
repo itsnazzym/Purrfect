@@ -680,6 +680,8 @@ class RemoteSideContext(
         ).distinctBy { it.absolutePath }
     }
 
+
+
     private fun whatsAppFeatureExternalFiles(): List<File> {
         return listOf(
             File("/storage/emulated/0/Android/media/${BuildConfig.APPLICATION_ID}/$WHATSAPP_FEATURE_CONFIG_FILE"),
@@ -792,6 +794,22 @@ class RemoteSideContext(
                 .apply()
         }
         sharedPreferences.edit().putLong("last_build_version_code", currentVersion).apply()
+    }
+
+    fun syncSkinSettings() {
+        runCatching {
+            val uiSettings = config.root.global.uiSettings
+            sharedPreferences.edit()
+                .putString("manager_theme", uiSettings.managerTheme.get())
+                .putString("aphelion_skin", uiSettings.aphelionSkin.get())
+                .putString("lumina_mode", uiSettings.luminaMode.get())
+                .putString("lumina_accent", uiSettings.luminaAccent.get())
+                .putString("aether_mode", uiSettings.aetherMode.get())
+                .putString("aether_accent", uiSettings.aetherAccent.get())
+                .putBoolean("aether_amoled", uiSettings.aetherAmoled.get())
+                .putString("cyberware_style", uiSettings.cyberwareStyle.get())
+                .apply()
+        }
     }
 
     companion object {

@@ -1,6 +1,10 @@
 package me.eternal.purrfect.bridge;
 
 import java.util.List;
+import java.util.Map;
+import android.content.Intent;
+import android.os.ParcelFileDescriptor;
+
 import me.eternal.purrfect.bridge.DownloadCallback;
 import me.eternal.purrfect.bridge.SyncCallback;
 import me.eternal.purrfect.bridge.scripting.IScripting;

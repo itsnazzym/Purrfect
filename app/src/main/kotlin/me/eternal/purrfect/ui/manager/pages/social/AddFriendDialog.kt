@@ -8,6 +8,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.*
 import me.eternal.purrfect.RemoteSideContext
 import me.eternal.purrfect.common.data.MessagingFriendInfo
@@ -31,8 +37,10 @@ import me.eternal.purrfect.common.util.snap.BitmojiSelfie
 import me.eternal.purrfect.storage.getFriends
 import me.eternal.purrfect.storage.getGroups
 import me.eternal.purrfect.storage.getRuleIds
-import me.eternal.purrfect.ui.manager.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.theme.PurrfectPalette
 import me.eternal.purrfect.ui.util.coil.BitmojiImage
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import androidx.compose.ui.platform.LocalContext
 
 class AddFriendDialog(
     private val context: RemoteSideContext,
@@ -58,6 +66,8 @@ class AddFriendDialog(
         getCurrentState: () -> Boolean,
         onState: (Boolean) -> Unit = {},
     ) {
+        val managerTheme = remember { context.config.root.global.uiSettings.managerTheme.get() }
+        val skin = if (managerTheme == "APHELION") LocalPurrfectSkin.current else PurrfectPalette
         val cachedState = stateCache[id]
         LaunchedEffect(id, cachedState) {
             if (cachedState == null) {
@@ -83,14 +93,14 @@ class AddFriendDialog(
             shadowElevation = 0.dp,
             border = BorderStroke(
                 1.dp,
-                if (currentState) Brush.linearGradient(listOf(PurrfectPalette.glowPrimary, PurrfectPalette.glowSecondary))
-                else SolidColor(Color.White.copy(alpha = 0.08f))
+                if (currentState) Brush.linearGradient(listOf(skin.glowPrimary, skin.glowSecondary))
+                else SolidColor(skin.textPrimary.copy(alpha = 0.08f))
             )
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(PurrfectPalette.cardOverlay, cardShape)
+                    .background(skin.cardOverlay, cardShape)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -114,7 +124,7 @@ class AddFriendDialog(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = Color.White
+                        color = skin.textPrimary
                     )
 
                     participantsCount?.let {
@@ -122,7 +132,7 @@ class AddFriendDialog(
                             text = translation.format("participants_text", "count" to it.toString()),
                             fontSize = 12.sp,
                             lineHeight = 12.sp,
-                            color = PurrfectPalette.textSecondary
+                            color = skin.textSecondary
                         )
                     }
                 }
@@ -134,10 +144,10 @@ class AddFriendDialog(
                         coroutineScope.launch(Dispatchers.IO) { onState(it) }
                     },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = PurrfectPalette.glowPrimary.copy(alpha = 0.6f),
-                        uncheckedThumbColor = Color.White.copy(alpha = 0.8f),
-                        uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                        checkedThumbColor = skin.textPrimary,
+                        checkedTrackColor = skin.glowPrimary.copy(alpha = 0.6f),
+                        uncheckedThumbColor = skin.textPrimary.copy(alpha = 0.8f),
+                        uncheckedTrackColor = skin.textPrimary.copy(alpha = 0.2f)
                     )
                 )
             }
@@ -146,14 +156,15 @@ class AddFriendDialog(
 
     @Composable
     private fun DialogHeader(searchKeyword: MutableState<String>) {
+        val skin = LocalPurrfectSkin.current
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     brush = Brush.linearGradient(
                         listOf(
-                            PurrfectPalette.glowPrimary.copy(alpha = 0.4f),
-                            PurrfectPalette.glowSecondary.copy(alpha = 0.35f)
+                            skin.glowPrimary.copy(alpha = 0.4f),
+                            skin.glowSecondary.copy(alpha = 0.35f)
                         )
                     ),
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
@@ -161,7 +172,7 @@ class AddFriendDialog(
                 .padding(horizontal = 16.dp, vertical = 18.dp)
         ) {
             Text(
-                text = translation["title"],
+                text = translation["title"] ?: "Add Participants",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White
@@ -173,8 +184,8 @@ class AddFriendDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             shape = RoundedCornerShape(18.dp),
-            color = PurrfectPalette.cardOverlayColor,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+            color = skin.cardOverlayColor,
+            border = BorderStroke(1.dp, skin.textPrimary.copy(alpha = 0.12f)),
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
@@ -182,29 +193,29 @@ class AddFriendDialog(
                 value = searchKeyword.value,
                 onValueChange = { searchKeyword.value = it },
                 placeholder = {
-                    Text(text = translation["search_hint"], color = PurrfectPalette.textSecondary)
+                    Text(text = translation["search_hint"] ?: "Search", color = skin.textSecondary)
                 },
                 modifier = Modifier
                     .fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
                 leadingIcon = {
-                    Icon(Icons.Filled.Search, contentDescription = translation["search_icon_description"])
+                    Icon(Icons.Filled.Search, contentDescription = translation["search_icon_description"], tint = skin.textPrimary)
                 },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = PurrfectPalette.cardOverlayColor.copy(alpha = 0.9f),
-                    unfocusedContainerColor = PurrfectPalette.cardOverlayColor.copy(alpha = 0.8f),
+                    focusedContainerColor = skin.cardOverlayColor.copy(alpha = 0.95f),
+                    unfocusedContainerColor = skin.textPrimary.copy(alpha = 0.05f),
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = Color.White,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLeadingIconColor = Color.White,
-                    unfocusedLeadingIconColor = Color.White.copy(alpha = 0.85f),
-                    focusedPlaceholderColor = PurrfectPalette.textSecondary,
-                    unfocusedPlaceholderColor = PurrfectPalette.textSecondary
+                    cursorColor = skin.glowSecondary,
+                    focusedTextColor = skin.textPrimary,
+                    unfocusedTextColor = skin.textPrimary,
+                    focusedLeadingIconColor = skin.glowSecondary,
+                    unfocusedLeadingIconColor = skin.textPrimary.copy(alpha = 0.6f),
+                    focusedPlaceholderColor = skin.textSecondary,
+                    unfocusedPlaceholderColor = skin.textSecondary
                 ),
-                textStyle = LocalTextStyle.current.copy(color = Color.White)
+                textStyle = LocalTextStyle.current.copy(color = skin.textPrimary)
             )
         }
     }
@@ -212,6 +223,7 @@ class AddFriendDialog(
 
     @Composable
     fun Content(dismiss: () -> Unit = { }) {
+        val skin = LocalPurrfectSkin.current
         var cachedFriends by remember { mutableStateOf(null as List<MessagingFriendInfo>?) }
         var cachedGroups by remember { mutableStateOf(null as List<MessagingGroupInfo>?) }
 
@@ -225,30 +237,24 @@ class AddFriendDialog(
                 friends: List<MessagingFriendInfo>,
                 groups: List<MessagingGroupInfo>
             ) {
-                coroutineScope.launch(Dispatchers.IO) {
-                    val sortedFriends = context.sortSocialFriends(friends, pinnedIds = pinnedIds)
-                    val sortedGroups = groups.run {
-                        if (pinnedIds != null) {
-                            sortedBy { -pinnedIds.indexOf(it.conversationId) }
-                        } else {
-                            // Priority sort for whitelisted groups
-                            val whitelistedIds = context.database.getRuleIds(MessagingRuleType.STEALTH.key).toSet()
-                            sortedWith { a, b ->
-                                val aSelected = whitelistedIds.contains(a.conversationId)
-                                val bSelected = whitelistedIds.contains(b.conversationId)
-                                if (aSelected != bSelected) if (aSelected) -1 else 1
-                                else a.name.compareTo(b.name, ignoreCase = true)
-                            }
+                cachedFriends = context.sortSocialFriends(friends, pinnedIds = pinnedIds)
+                cachedGroups = groups.run {
+                    if (pinnedIds != null) {
+                        sortedBy { -pinnedIds.indexOf(it.conversationId) }
+                    } else {
+                        // Priority sort for whitelisted groups
+                        val whitelistedIds = context.database.getRuleIds(MessagingRuleType.STEALTH.key).toSet()
+                        sortedWith { a, b ->
+                            val aSelected = whitelistedIds.contains(a.conversationId)
+                            val bSelected = whitelistedIds.contains(b.conversationId)
+                            if (aSelected != bSelected) if (aSelected) -1 else 1
+                            else a.name.compareTo(b.name, ignoreCase = true)
                         }
                     }
-                    withContext(Dispatchers.Main) {
-                        cachedFriends = sortedFriends
-                        cachedGroups = sortedGroups
-                        if (friends.isNotEmpty() || groups.isNotEmpty()) {
-                            timeoutJob?.cancel()
-                            hasFetchError = false
-                        }
-                    }
+                }
+                if (friends.isNotEmpty() || groups.isNotEmpty()) {
+                    timeoutJob?.cancel()
+                    hasFetchError = false
                 }
             }
 
@@ -297,10 +303,10 @@ class AddFriendDialog(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 shape = dialogShape,
-                color = PurrfectPalette.cardOverlayColor,
+                color = skin.cardOverlayColor,
                 tonalElevation = 0.dp,
                 shadowElevation = 12.dp,
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+                border = BorderStroke(1.dp, skin.textPrimary.copy(alpha = 0.12f))
             ) {
                 Column {
                     if (cachedGroups == null || cachedFriends == null) {
@@ -312,18 +318,18 @@ class AddFriendDialog(
                         ) {
                             if (hasFetchError) {
                                 Text(
-                                    text = translation["fetch_error"],
+                                    text = translation["fetch_error"] ?: "Fetch Error",
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(bottom = 10.dp, top = 10.dp),
-                                    color = Color.White
+                                    color = skin.textPrimary
                                 )
                             } else {
                                 CircularProgressIndicator(
                                     modifier = Modifier
                                         .size(32.dp),
                                     strokeWidth = 3.dp,
-                                    color = PurrfectPalette.glowSecondary
+                                    color = skin.glowSecondary
                                 )
                             }
                         }
@@ -331,6 +337,10 @@ class AddFriendDialog(
                     }
 
                     val searchKeyword = remember { mutableStateOf("") }
+
+                    BackHandler(enabled = searchKeyword.value.isNotEmpty()) {
+                        searchKeyword.value = ""
+                    }
 
                     val filteredGroups = cachedGroups!!.takeIf { searchKeyword.value.isNotBlank() }?.filter {
                         it.name.contains(searchKeyword.value, ignoreCase = true)
@@ -378,10 +388,10 @@ class AddFriendDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = translation["category_groups"],
+                                        text = translation["category_groups"] ?: "Groups",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        color = skin.textPrimary
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         TextButton(
@@ -396,8 +406,8 @@ class AddFriendDialog(
                                             enabled = !allGroupsSelected
                                         ) {
                                             Text(
-                                                text = context.translation["manager.dialogs.messaging_action.select_all_button"],
-                                                color = if (allGroupsSelected) Color.White.copy(alpha = 0.45f) else PurrfectPalette.glowSecondary
+                                                text = context.translation["manager.dialogs.messaging_action.select_all_button"] ?: "Select All",
+                                                color = if (allGroupsSelected) skin.textPrimary.copy(alpha = 0.45f) else skin.glowSecondary
                                             )
                                         }
                                         TextButton(
@@ -412,8 +422,8 @@ class AddFriendDialog(
                                             enabled = hasGroupsSelected
                                         ) {
                                             Text(
-                                                text = translation["unselect_all_button"],
-                                                color = if (hasGroupsSelected) PurrfectPalette.glowPrimary else Color.White.copy(alpha = 0.45f)
+                                                text = translation["unselect_all_button"] ?: "Unselect All",
+                                                color = if (hasGroupsSelected) skin.glowPrimary else skin.textPrimary.copy(alpha = 0.45f)
                                             )
                                         }
                                     }
@@ -443,10 +453,10 @@ class AddFriendDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = translation["category_friends"],
+                                        text = translation["category_friends"] ?: "Friends",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        color = skin.textPrimary
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         TextButton(
@@ -461,8 +471,8 @@ class AddFriendDialog(
                                             enabled = !allFriendsSelected
                                         ) {
                                             Text(
-                                                text = context.translation["manager.dialogs.messaging_action.select_all_button"],
-                                                color = if (allFriendsSelected) Color.White.copy(alpha = 0.45f) else PurrfectPalette.glowSecondary
+                                                text = context.translation["manager.dialogs.messaging_action.select_all_button"] ?: "Select All",
+                                                color = if (allFriendsSelected) skin.textPrimary.copy(alpha = 0.45f) else skin.glowSecondary
                                             )
                                         }
                                         TextButton(
@@ -477,8 +487,8 @@ class AddFriendDialog(
                                             enabled = hasFriendsSelected
                                         ) {
                                             Text(
-                                                text = translation["unselect_all_button"],
-                                                color = if (hasFriendsSelected) PurrfectPalette.glowPrimary else Color.White.copy(alpha = 0.45f)
+                                                text = translation["unselect_all_button"] ?: "Unselect All",
+                                                color = if (hasFriendsSelected) skin.glowPrimary else skin.textPrimary.copy(alpha = 0.45f)
                                             )
                                         }
                                     }

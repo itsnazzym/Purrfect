@@ -23,7 +23,11 @@ import me.eternal.purrfect.core.util.ktx.setObjectField
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 class CameraTweaks : Feature("Camera Tweaks") {
+    private val isRecording = AtomicBoolean(false)
+
     private fun parseResolution(resolution: String): IntArray? {
         return runCatching { resolution.split("x").map { it.toInt() }.toIntArray() }.getOrNull()
     }
@@ -45,6 +49,13 @@ class CameraTweaks : Feature("Camera Tweaks") {
                     CaptureRequest.HOT_PIXEL_MODE -> param.setArg(1, CaptureRequest.HOT_PIXEL_MODE_HIGH_QUALITY)
                     CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE -> param.setArg(1, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY)
                     CaptureRequest.CONTROL_AF_MODE -> param.setArg(1, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                    CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE -> {
+                        if (!isRecording.get()) return@hook
+                        val currentRange = param.arg<Range<Int>>(1)
+                        if (currentRange.upper < 60) {
+                            param.setArg(1, Range(30, 60))
+                        }
+                    }
                 }
             }
         }
@@ -58,20 +69,31 @@ class CameraTweaks : Feature("Camera Tweaks") {
             }
             
             // Modern Arroyo Video Pipeline Overdrive (Hardware Encoder)
+            MediaCodec::class.java.hook("start", HookStage.BEFORE) { isRecording.set(true) }
+            MediaCodec::class.java.hook("stop", HookStage.BEFORE) { isRecording.set(false) }
+
             MediaCodec::class.java.hook("configure", HookStage.BEFORE) { param ->
                 val format = param.argNullable<MediaFormat>(0) ?: return@hook
                 
                 // Only override video encoding formats
                 val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
-                if (mime.startsWith("video/")) {
-                    // Force 50Mbps Constant Bitrate (CBR) for absolute maximum quality
-                    format.setInteger(MediaFormat.KEY_BIT_RATE, 50_000_000)
-                    format.setInteger(MediaFormat.KEY_BITRATE_MODE, android.media.MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
-                    
-                    // Force hardware encoder to prioritize quality over speed
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        format.setInteger(MediaFormat.KEY_COMPLEXITY, 2) // Typically highest complexity for H264/HEVC
-                    }
+                if (!mime.startsWith("video/")) return@hook
+
+                // Only boost if the existing bitrate suggests this is a capture encoder
+                val existingBitrate = runCatching {
+                    format.getInteger(MediaFormat.KEY_BIT_RATE)
+                }.getOrNull() ?: return@hook
+
+                // Skip upload transcoders — they have bitrates < 15Mbps
+                if (existingBitrate < 15_000_000) return@hook
+
+                // Force 50Mbps Constant Bitrate (CBR) for absolute maximum quality
+                format.setInteger(MediaFormat.KEY_BIT_RATE, 50_000_000)
+                format.setInteger(MediaFormat.KEY_BITRATE_MODE, android.media.MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+                
+                // Force hardware encoder to prioritize quality over speed
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    format.setInteger(MediaFormat.KEY_COMPLEXITY, 2) // Typically highest complexity for H264/HEVC
                 }
             }
         }
@@ -85,6 +107,18 @@ class CameraTweaks : Feature("Camera Tweaks") {
                 param.setArg(0, 48_000)
             }
         }
+
+        val anyCameraFeatureEnabled = config.disableCameras.get().isNotEmpty() ||
+            config.startupDefaultCamera.getNullable() != null ||
+            config.customResolution.getNullable() != null ||
+            config.overrideFrontResolution.getNullable() != null ||
+            config.overrideBackResolution.getNullable() != null ||
+            config.unlockZoomLimit.get() ||
+            config.frontCustomFrameRate.getNullable() != null ||
+            config.backCustomFrameRate.getNullable() != null ||
+            config.blackPhotos.get()
+
+        if (!anyCameraFeatureEnabled) return
 
         val frontCameraId by lazy {
             runCatching { context.androidContext.getSystemService(CameraManager::class.java).run {

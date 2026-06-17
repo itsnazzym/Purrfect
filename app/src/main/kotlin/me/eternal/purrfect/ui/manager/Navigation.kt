@@ -1,13 +1,11 @@
 package me.eternal.purrfect.ui.manager
 
+import android.app.Activity
+import android.os.Build
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -19,30 +17,9 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,27 +29,23 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.BrightnessLow
+import androidx.compose.material.icons.filled.BrightnessHigh
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,10 +53,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -97,17 +68,34 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.horizontalScroll
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import me.eternal.purrfect.RemoteSideContext
-import me.eternal.purrfect.ui.manager.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import me.eternal.purrfect.common.ui.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.theme.PurrfectColorSet
 import me.eternal.purrfect.ui.manager.theme.aphelion.ThemeRevealState
-import kotlin.math.round
+import me.eternal.purrfect.common.ui.util.G2RoundedRectangle
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.math.round
+import androidx.compose.ui.graphics.SolidColor
+import me.eternal.purrfect.ui.manager.theme.aetherGlass
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import me.eternal.purrfect.ui.manager.components.AestheticDialog
+import me.eternal.purrfect.ui.util.headerHeightTracker
+import me.eternal.purrfect.ui.util.Motion
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -123,6 +111,10 @@ class Navigation(
     private val translation by lazy { context.translation.getCategory("manager.navigation") }
     var openBottomBarCustomization by mutableStateOf(false)
     var globalScrollOffset by mutableIntStateOf(0)
+    var pendingTransmission by mutableStateOf<String?>(null)
+    var isFirstUnlock by mutableStateOf(false)
+    var showCinematic by mutableStateOf(false)
+    var showGame by mutableStateOf(false)
     val themeRevealState = ThemeRevealState()
 
     @Composable
@@ -131,17 +123,37 @@ class Navigation(
         val currentRoute = remember(navBackStackEntry) { routes.getCurrentRoute(navBackStackEntry) }
         if (currentRoute?.routeInfo?.hasOwnTopBar == true) return
 
-        val shrinkThreshold = me.eternal.purrfect.ui.util.Motion.HEADER_MORPH_THRESHOLD
+        val shrinkThreshold = Motion.HEADER_MORPH_THRESHOLD
         val isAphelion = context.config.root.global.uiSettings.managerTheme.get() == "APHELION"
+        val skin = if (isAphelion) LocalPurrfectSkin.current else PurrfectPalette
         val focusFactor = if (isAphelion) (globalScrollOffset / shrinkThreshold).coerceIn(0f, 1f) else 0f
-        val headerHeight = lerp(64.dp, 48.dp, focusFactor)
+
+        val springFocusFactor by animateFloatAsState(
+            targetValue = focusFactor,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow),
+            label = "aetherSpring"
+        )
+        val activeFocus = if (skin.id == "AETHER") springFocusFactor else focusFactor
+        val headerHeight = lerp(64.dp, 48.dp, activeFocus)
 
         val canGoBack = remember(navBackStackEntry) {
             currentRoute?.let { !it.routeInfo.primary || it.routeInfo.childIds.contains(routes.currentDestination) } == true
         }
         val haptic = LocalHapticFeedback.current
+
+        val topBarModifier = Modifier
+            .height(headerHeight)
+            .then(
+                if (skin.id == "AETHER" || skin.id == "LUMINA") {
+                    Modifier.background(skin.cardOverlayColor, RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
+                        .border(2.dp, skin.glassBorder, RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
+                } else {
+                    Modifier.aetherGlass(skin = skin, bottomStart = 22.dp, bottomEnd = 22.dp, focusFactor = activeFocus)
+                }
+            )
+
         TopAppBar(
-            modifier = Modifier.height(headerHeight),
+            modifier = topBarModifier,
             title = {
                 currentRoute?.apply {
                     title?.invoke() ?: routeInfo.translatedKey?.value?.let {
@@ -150,9 +162,8 @@ class Navigation(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
-                                scaleX = 1f - (focusFactor * 0.05f)
-                                scaleY = 1f - (focusFactor * 0.05f)
-                                translationY = (-2 * focusFactor).dp.toPx()
+                                scaleX = 1f - (activeFocus * 0.05f)
+                                scaleY = 1f - (activeFocus * 0.05f)
                             }
                         )
                     }
@@ -164,15 +175,15 @@ class Navigation(
                     modifier = Modifier
                         .graphicsLayer {
                             alpha = backButtonAnimation
-                            scaleX = 1f - (focusFactor * 0.1f)
-                            scaleY = 1f - (focusFactor * 0.1f)
+                            scaleX = 1f - (activeFocus * 0.1f)
+                            scaleY = 1f - (activeFocus * 0.1f)
                         }
                         .width(lerp(0.dp, 48.dp, backButtonAnimation))
                         .height(48.dp)
                 ) {
                     IconButton(onClick = {
                         if (canGoBack) {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             navController.popBackStack()
                         }
                     }) {
@@ -182,13 +193,16 @@ class Navigation(
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
-                scrolledContainerColor = Color.Transparent
+                scrolledContainerColor = Color.Transparent,
+                navigationIconContentColor = skin.textPrimary,
+                titleContentColor = skin.textPrimary,
+                actionIconContentColor = skin.textPrimary
             ),
             actions = {
                 currentRoute?.topBarActions?.invoke(this)
-                if (currentRoute?.routeInfo?.id == routes.settings.routeInfo.id && !context.isLimitedTargetMode) {
+                if (currentRoute?.routeInfo?.id == routes.settings.routeInfo.id) {
                     IconButton(onClick = {
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         openBottomBarCustomization = true
                     }) {
                         Icon(Icons.Filled.Tune, contentDescription = null)
@@ -213,12 +227,15 @@ class Navigation(
         }
         val availableRouteMap = remember(availableRoutes) { availableRoutes.associateBy { it.routeInfo.id } }
 
-        val shrinkThreshold = me.eternal.purrfect.ui.util.Motion.HEADER_MORPH_THRESHOLD
+        val shrinkThreshold = Motion.HEADER_MORPH_THRESHOLD
         val isAphelion = context.config.root.global.uiSettings.managerTheme.get() == "APHELION"
+        val skin = if (isAphelion) LocalPurrfectSkin.current else PurrfectPalette
         val focusFactor = if (isAphelion) (globalScrollOffset / shrinkThreshold).coerceIn(0f, 1f) else 0f
         val barHeight = lerp(82.dp, 64.dp, focusFactor)
         val labelAlpha = (1f - (focusFactor * 2.5f)).coerceIn(0f, 1f)
         val iconTranslationY = (10 * focusFactor).dp
+
+        val isMechanicalMode = skin.id == "AETHER" || skin.id == "LUMINA"
 
         val prefs = remember { context.sharedPreferences }
         val defaultOrder = remember(isLimitedTargetMode) {
@@ -251,23 +268,42 @@ class Navigation(
         }
         var selectedTabIds by remember(isLimitedTargetMode) { mutableStateOf(loadSelected()) }
         val selectedRoutes = remember(selectedTabIds) { selectedTabIds.mapNotNull { availableRouteMap[it] } }
-        val barShape = RoundedCornerShape(28.dp)
-        val barBorder = remember {
+
+        // GATED GEOMETRY: Restore 28.dp for LUX/NOX, bold 32.dp for Performance
+        val barShape = remember(isMechanicalMode, isAphelion) {
+            if (isMechanicalMode) G2RoundedRectangle(32.dp)
+            else if (isAphelion) RoundedCornerShape(28.dp)
+            else RoundedCornerShape(32.dp)
+        }
+
+        val barBorder = remember(skin) {
             Brush.linearGradient(
                 listOf(
-                    PurrfectPalette.glowPrimary.copy(alpha = 0.9f),
-                    PurrfectPalette.glowSecondary.copy(alpha = 0.85f)
+                    skin.glowPrimary.copy(alpha = 0.9f),
+                    skin.glowSecondary.copy(alpha = 0.85f)
                 )
             )
         }
+
+        // SLAB GRADIENT: High-opacity vertical gradient for premium feel
+        val slabGradient = remember(skin) {
+            Brush.verticalGradient(
+                listOf(
+                    skin.cardOverlayColor.copy(alpha = 0.98f),
+                    skin.cardOverlayColor.copy(alpha = 0.95f)
+                )
+            )
+        }
+
         val barSheen = remember {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.14f),
+                    skin.textPrimary.copy(alpha = 0.14f),
                     Color.Transparent
                 )
             )
         }
+
         Box(
             Modifier
                 .fillMaxWidth()
@@ -279,41 +315,22 @@ class Navigation(
             val containerPadding = 24.dp
             val targetBarWidth = if (selectedRoutes.size < 5) baseItemWidth * selectedRoutes.size.toFloat() + containerPadding else null
             val animatedBarWidth by animateDpAsState(targetValue = targetBarWidth ?: 0.dp, label = "barWidth")
+
             Surface(
                 shape = barShape,
-                color = Color.White.copy(alpha = 0.08f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                color = Color.Transparent,
+                contentColor = skin.textPrimary,
                 border = BorderStroke(
-                    1.dp,
-                    Brush.linearGradient(
-                        listOf(
-                            PurrfectPalette.glowPrimary.copy(alpha = 0.9f),
-                            PurrfectPalette.glowSecondary.copy(alpha = 0.85f)
-                        )
-                    )
+                    if (skin.id == "AETHER") 2.dp else 1.dp,
+                    if (skin.id == "AETHER") SolidColor(skin.glowPrimary) else barBorder
                 ),
                 modifier = Modifier
                     .then(if (targetBarWidth != null) Modifier.width(animatedBarWidth) else Modifier.fillMaxWidth())
-                    .drawBehind {
-                        val radius = size.width * 0.62f
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    PurrfectPalette.glowPrimary.copy(alpha = 0.25f),
-                                    Color.Transparent
-                                ),
-                                center = center,
-                                radius = radius
-                            ),
-                            radius = radius,
-                            center = center
-                        )
-                    }
                     .shadow(
-                        elevation = 28.dp,
+                        elevation = if (skin.id == "AETHER") 0.dp else 28.dp,
                         shape = barShape,
-                        spotColor = PurrfectPalette.glowPrimary.copy(alpha = 0.35f),
-                        ambientColor = PurrfectPalette.glowSecondary.copy(alpha = 0.26f)
+                        spotColor = skin.glowPrimary.copy(alpha = 0.35f),
+                        ambientColor = skin.glowSecondary.copy(alpha = 0.26f)
                     )
             ) {
                 Box(
@@ -321,37 +338,49 @@ class Navigation(
                         .fillMaxWidth()
                         .height(barHeight)
                         .clip(barShape)
-                        .background(PurrfectPalette.cardOverlay)
-                        .border(BorderStroke(1.dp, barBorder), barShape)
+                        .background(if (skin.id == "AETHER") skin.cardOverlayColor else Color.Transparent)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(18.dp)
-                            .align(Alignment.TopCenter)
-                            .background(barSheen)
-                            .graphicsLayer { alpha = 0.6f }
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .graphicsLayer { alpha = 0.25f }
-                            .drawBehind {
-                                val radius = size.width * 0.42f
-                                drawCircle(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            PurrfectPalette.glowSecondary.copy(alpha = 0.2f),
-                                            Color.Transparent
+                    // LAYER 1: Core Material Slab (All skins except Aether)
+                    if (skin.id != "AETHER") {
+                        Box(Modifier.matchParentSize().background(slabGradient))
+                    }
+
+                    // LAYER 2: Physical Rim Sheen (All skins except Aether)
+                    if (skin.id != "AETHER") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(18.dp)
+                                .align(Alignment.TopCenter)
+                                .background(barSheen)
+                                .graphicsLayer { alpha = 0.6f }
+                        )
+                    }
+
+                    // LAYER 3: Refractive Mesh Glow (All skins except Aether)
+                    if (skin.id != "AETHER") {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .graphicsLayer { alpha = 0.25f }
+                                .drawBehind {
+                                    val radius = size.width * 0.42f
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(
+                                                skin.glowSecondary.copy(alpha = 0.2f),
+                                                Color.Transparent
+                                            ),
+                                            center = center,
+                                            radius = radius
                                         ),
-                                        center = center,
-                                        radius = radius
-                                    ),
-                                    radius = radius,
-                                    center = center
-                                )
-                            }
-                    )
+                                        radius = radius,
+                                        center = center
+                                    )
+                                }
+                        )
+                    }
+
                     Box(Modifier.fillMaxWidth().height(barHeight)) {
                         var barWidthPx by remember { mutableStateOf(0f) }
                         val itemCount = selectedRoutes.size.coerceAtLeast(1)
@@ -379,7 +408,7 @@ class Navigation(
                                     dist == 2 -> 0.75f
                                     else -> 0.90f
                                 }
-                                val stiffness = Spring.StiffnessMediumLow
+                                val stiffness = if (isMechanicalMode) 450f else Spring.StiffnessMediumLow
                                 offsetAnim.animateTo(
                                     targetValue = selectedIndex * itemWidthPx,
                                     animationSpec = spring(dampingRatio = damping, stiffness = stiffness)
@@ -417,56 +446,39 @@ class Navigation(
                                 val mult = (distForScale - 1).coerceAtLeast(0)
                                 val scaleXAnim = 1f + (scaleXBase + scaleXExtra * mult) * pulse
                                 val scaleYAnim = 1f - (scaleYBase + scaleYExtra * mult) * pulse
-                                if (barWidthPx > 0f && itemCount > 0) {
-                                    val offsetX = with(density) { offsetAnim.value.toDp() } + horizontalInset
-                                    val indicatorShape = RoundedCornerShape(18.dp)
+                                // Page Indicator (Always visible)
+                                val offsetX = if (barWidthPx > 0f) with(density) { offsetAnim.value.toDp() } + horizontalInset else 0.dp
+
+                                // DYNAMIC GEOMETRY: 18.dp Squircle (Expanded) -> 24.dp Pill (Shrunk)
+                                val indicatorShape = if (isMechanicalMode) {
+                                    G2RoundedRectangle(lerp(18.dp, 24.dp, focusFactor))
+                                } else {
+                                    RoundedCornerShape(18.dp)
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .width(indicatorWidth.coerceAtLeast(0.dp))
+                                        .offset(x = offsetX)
+                                        .padding(vertical = if (isMechanicalMode) 12.dp else lerp(10.dp, 8.dp, focusFactor), horizontal = 2.dp)
+                                        .graphicsLayer { scaleX = scaleXAnim; scaleY = scaleYAnim }
+                                        .clip(indicatorShape)
+                                ) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxHeight()
-                                            .width(indicatorWidth.coerceAtLeast(0.dp))
-                                            .offset(x = offsetX)
-                                            .padding(vertical = lerp(10.dp, 8.dp, focusFactor), horizontal = 2.dp)
-                                            .graphicsLayer { scaleX = scaleXAnim; scaleY = scaleYAnim }
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .matchParentSize()
-                                                .clip(indicatorShape)
-                                                .background(
-                                                    Brush.linearGradient(
-                                                        listOf(
-                                                            PurrfectPalette.glowPrimary.copy(alpha = 0.42f),
-                                                            PurrfectPalette.glowSecondary.copy(alpha = 0.38f)
-                                                        )
+                                            .matchParentSize()
+                                            .background(
+                                                if (isMechanicalMode) SolidColor(skin.glowPrimary)
+                                                else Brush.linearGradient(
+                                                    listOf(
+                                                        skin.glowPrimary.copy(alpha = 0.85f),
+                                                        skin.glowSecondary.copy(alpha = 0.75f)
                                                     )
                                                 )
-                                                .border(
-                                                    BorderStroke(1.dp, Brush.linearGradient(listOf(PurrfectPalette.glowPrimary, PurrfectPalette.glowSecondary))),
-                                                    indicatorShape
-                                                )
-                                                .drawBehind {
-                                                    drawCircle(
-                                                        brush = Brush.radialGradient(
-                                                            colors = listOf(
-                                                                PurrfectPalette.glowPrimary.copy(alpha = 0.35f),
-                                                                Color.Transparent
-                                                            ),
-                                                            center = center,
-                                                            radius = size.minDimension
-                                                        ),
-                                                        radius = size.minDimension,
-                                                        center = center
-                                                    )
-                                                    drawRoundRect(
-                                                        color = Color.White.copy(alpha = 0.08f),
-                                                        cornerRadius = CornerRadius(size.height / 2, size.height / 2),
-                                                        size = size
-                                                    )
-                                                }
-                                        )
-                                    }
-                                }
-                            }
+                                            )
+                                    )
+                                }                            }
                         }
                         NavigationBar(
                             containerColor = Color.Transparent,
@@ -478,6 +490,14 @@ class Navigation(
                             selectedRoutes.forEach { route ->
                                 val isSelected = currentRoute == route
                                 val selectionProgress by animateFloatAsState(if (isSelected) 1f else 0f, label = "${route.routeInfo.id}-selection")
+                                
+                                // SCATTERED GRADIENT: Illuminated text/icon visuals for Aphelion
+                                val itemTint = if (isSelected) {
+                                    skin.primaryButtonText
+                                } else {
+                                    skin.textPrimary
+                                }
+
                                 NavigationBarItem(
                                     alwaysShowLabel = true,
                                     icon = {
@@ -487,20 +507,21 @@ class Navigation(
                                             modifier = Modifier
                                                 .size(22.dp + 2.dp * selectionProgress)
                                                 .graphicsLayer { 
-                                                    alpha = 0.65f + 0.35f * selectionProgress
+                                                    alpha = if (isSelected) 1f else (0.65f + 0.35f * selectionProgress)
                                                     translationY = iconTranslationY.toPx()
-                                                }
+                                                },
+                                            tint = itemTint
                                         )
                                     },
                                     label = {
-                                        val label = context.translation["manager.routes.${route.routeInfo.key.substringBefore("/")}"]
+                                        val label = context.translation["manager.routes.${route.routeInfo.key.substringBefore("/")}"] ?: ""
                                         val isLong = label.length > 11
                                         Text(
                                             text = label,
                                             textAlign = TextAlign.Center,
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = (0.6f + 0.4f * selectionProgress) * labelAlpha),
+                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                            color = itemTint.copy(alpha = (0.6f + 0.4f * selectionProgress) * labelAlpha),
                                             maxLines = if (isLong) 2 else 1,
                                             overflow = if (isLong) TextOverflow.Ellipsis else TextOverflow.Clip,
                                             softWrap = isLong,
@@ -513,14 +534,14 @@ class Navigation(
                                     },
                                     selected = isSelected,
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = Color.White,
-                                        unselectedIconColor = Color.White.copy(alpha = 0.72f),
-                                        selectedTextColor = Color.White,
-                                        unselectedTextColor = Color.White.copy(alpha = 0.72f),
+                                        selectedIconColor = Color.Transparent, // Managed by manual tint
+                                        unselectedIconColor = skin.textPrimary.copy(alpha = 0.72f),
+                                        selectedTextColor = Color.Transparent, // Managed by manual color
+                                        unselectedTextColor = skin.textPrimary.copy(alpha = 0.72f),
                                         indicatorColor = Color.Transparent
                                     ),
-                                    onClick = {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    onClick = { 
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         route.navigateReset() 
                                     }
                                 )
@@ -529,6 +550,7 @@ class Navigation(
                     }
                 }
             }
+
             if (openBottomBarCustomization) {
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 ModalBottomSheet(
@@ -545,11 +567,11 @@ class Navigation(
                         color = Color.Transparent,
                         tonalElevation = 0.dp,
                         shadowElevation = 12.dp,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                        border = BorderStroke(1.dp, skin.textPrimary.copy(alpha = 0.1f))
                     ) {
                         Column(
                             modifier = Modifier
-                                .background(PurrfectPalette.backgroundGradient)
+                                .background(skin.backgroundGradient)
                                 .padding(vertical = 12.dp)
                         ) {
                             Box(
@@ -560,8 +582,8 @@ class Navigation(
                                     .background(
                                         brush = Brush.linearGradient(
                                             colors = listOf(
-                                                PurrfectPalette.glowPrimary.copy(alpha = 0.28f),
-                                                PurrfectPalette.glowSecondary.copy(alpha = 0.26f)
+                                                skin.glowPrimary.copy(alpha = 0.28f),
+                                                skin.glowSecondary.copy(alpha = 0.26f)
                                             )
                                         )
                                     )
@@ -572,16 +594,16 @@ class Navigation(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
-                                        text = translation["customize_bottom_bar_title"],
+                                        text = translation["customize_bottom_bar_title"] ?: "Customize Bottom Bar",
                                         style = MaterialTheme.typography.titleLarge,
-                                        color = Color.White,
+                                        color = skin.textPrimary,
                                         textAlign = TextAlign.Center
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        text = translation["customize_bottom_bar_subtitle"],
+                                        text = translation["customize_bottom_bar_subtitle"] ?: "Select up to 5 tabs",
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = Color.White.copy(alpha = 0.8f),
+                                        color = skin.textSecondary,
                                         textAlign = TextAlign.Center
                                     )
                                 }
@@ -593,21 +615,21 @@ class Navigation(
                                     .width(40.dp)
                                     .height(5.dp)
                                     .clip(RoundedCornerShape(50))
-                                    .background(Color.White.copy(alpha = 0.35f))
+                                    .background(skin.textPrimary.copy(alpha = 0.35f))
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = translation["shown_tabs_title"],
+                                text = translation["shown_tabs_title"] ?: "Shown Tabs",
                                 style = MaterialTheme.typography.titleSmall,
                                 modifier = Modifier.padding(horizontal = 16.dp),
-                                color = Color.White
+                                color = skin.textPrimary
                             )
                             Spacer(Modifier.height(6.dp))
                             if (selectedTabIds.isEmpty()) {
                                 Text(
-                                    text = translation["no_tabs_selected_text"],
+                                    text = translation["no_tabs_selected_text"] ?: "No tabs selected",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = PurrfectPalette.textSecondary,
+                                    color = skin.textSecondary,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             } else {
@@ -626,7 +648,7 @@ class Navigation(
                                 ) {
                                     itemsIndexed(selectedTabIds, key = { _, id -> id }) { index, id ->
                                         val route = availableRouteMap[id] ?: return@itemsIndexed
-                                        val label = context.translation["manager.routes.${route.routeInfo.key.substringBefore("/")}"]
+                                        val label = context.translation["manager.routes.${route.routeInfo.key.substringBefore("/")}"] ?: ""
                                         val isDragging = draggingId == id
                                         val rowShape = RoundedCornerShape(18.dp)
                                         Surface(
@@ -643,7 +665,7 @@ class Navigation(
                                                             draggingId = id
                                                             dragStartIndex = selectedTabIds.indexOf(id)
                                                             dragDelta = 0f
-                                                            hapticCustom.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                            hapticCustom.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         },
                                                         onDrag = { _: PointerInputChange, dragAmount ->
                                                             dragDelta += dragAmount.y
@@ -657,7 +679,7 @@ class Navigation(
                                                                     list.add(targetIndex, id)
                                                                     selectedTabIds = list
                                                                     saveSelected(selectedTabIds)
-                                                                    hapticCustom.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                                                    hapticCustom.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                                 }
                                                             }
                                                         },
@@ -669,8 +691,8 @@ class Navigation(
                                             color = Color.Transparent,
                                             border = BorderStroke(
                                                 1.dp,
-                                                if (isDragging) Brush.linearGradient(listOf(PurrfectPalette.glowPrimary, PurrfectPalette.glowSecondary))
-                                                else SolidColor(Color.White.copy(alpha = 0.1f))
+                                                if (isDragging) Brush.linearGradient(listOf(skin.glowPrimary, skin.glowSecondary))
+                                                else SolidColor(skin.textPrimary.copy(alpha = 0.1f))
                                             ),
                                             tonalElevation = 0.dp,
                                             shadowElevation = 0.dp
@@ -683,28 +705,28 @@ class Navigation(
                                                     .background(
                                                         if (isDragging) Brush.linearGradient(
                                                             colors = listOf(
-                                                                PurrfectPalette.glowPrimary.copy(alpha = 0.18f),
-                                                                PurrfectPalette.glowSecondary.copy(alpha = 0.16f)
+                                                                skin.glowPrimary.copy(alpha = 0.18f),
+                                                                skin.glowSecondary.copy(alpha = 0.16f)
                                                             )
-                                                        ) else SolidColor(Color.White.copy(alpha = 0.08f))
+                                                        ) else SolidColor(skin.textPrimary.copy(alpha = 0.08f))
                                                     ),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Filled.DragHandle, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
+                                                Icon(Icons.Filled.DragHandle, contentDescription = null, tint = skin.textPrimary.copy(alpha = 0.8f))
                                                 Spacer(Modifier.width(8.dp))
-                                                Icon(route.routeInfo.icon, contentDescription = null, tint = Color.White)
+                                                Icon(route.routeInfo.icon, contentDescription = null, tint = skin.textPrimary)
                                                 Spacer(Modifier.width(12.dp))
-                                                Text(text = label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White)
+                                                Text(text = label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, color = skin.textPrimary)
                                                 val defaultEligible = remember { setOf("tasks","features","home","social","scripts") }
                                                 RadioButton(
                                                     selected = defaultTabId == id,
                                                     onClick = { if (id in defaultEligible) saveDefault(id) },
                                                     enabled = id in defaultEligible,
                                                     colors = RadioButtonDefaults.colors(
-                                                        selectedColor = PurrfectPalette.glowPrimary,
-                                                        unselectedColor = Color.White.copy(alpha = 0.7f),
-                                                        disabledSelectedColor = PurrfectPalette.glowPrimary.copy(alpha = 0.4f),
-                                                        disabledUnselectedColor = Color.White.copy(alpha = 0.35f)
+                                                        selectedColor = skin.glowPrimary,
+                                                        unselectedColor = skin.textPrimary.copy(alpha = 0.7f),
+                                                        disabledSelectedColor = skin.glowPrimary.copy(alpha = 0.4f),
+                                                        disabledUnselectedColor = skin.textPrimary.copy(alpha = 0.35f)
                                                     )
                                                 )
                                                 IconButton(
@@ -715,14 +737,14 @@ class Navigation(
                                                         }
                                                     },
                                                     enabled = id != defaultTabId && id != "home"
-                                                ) { Icon(Icons.Filled.Close, contentDescription = null, tint = Color.White) }
+                                                ) { Icon(Icons.Filled.Close, contentDescription = null, tint = skin.textPrimary) }
                                             }
                                         }
                                     }
                                 }
                             }
                             Spacer(Modifier.height(12.dp))
-                            Text(text = translation["available_tabs_title"], style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 16.dp), color = Color.White)
+                            Text(text = translation["available_tabs_title"] ?: "Available Tabs", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 16.dp), color = skin.textPrimary)
                             Spacer(Modifier.height(6.dp))
                             FlowRow(
                                 modifier = Modifier
@@ -733,7 +755,7 @@ class Navigation(
                                 availableRoutes.forEach { route ->
                                     val id = route.routeInfo.id
                                     val already = selectedTabIds.contains(id)
-                                    val label = context.translation["manager.routes.${route.routeInfo.key.substringBefore("/")}"]
+                                    val label = context.translation["manager.routes.${route.routeInfo.key.substringBefore("/")}"] ?: ""
                                     AnimatedVisibility(
                                         visible = !already && selectedTabIds.size < 5,
                                         enter = scaleIn(tween(160), initialScale = 0.95f) + fadeIn(tween(180)) + slideInVertically(tween(180), initialOffsetY = { it / 3 }),
@@ -750,9 +772,9 @@ class Navigation(
                                             leadingIcon = { Icon(route.routeInfo.icon, contentDescription = null) },
                                             enabled = true,
                                             colors = AssistChipDefaults.assistChipColors(
-                                                containerColor = Color.White.copy(alpha = 0.08f),
-                                                labelColor = Color.White,
-                                                leadingIconContentColor = PurrfectPalette.glowSecondary
+                                                containerColor = skin.textPrimary.copy(alpha = 0.08f),
+                                                labelColor = skin.textPrimary,
+                                                leadingIconContentColor = skin.glowSecondary
                                             )
                                         )
                                     }
@@ -770,19 +792,19 @@ class Navigation(
                                         selectedTabIds = defaultOrder
                                         saveSelected(selectedTabIds)
                                     },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                    border = BorderStroke(1.dp, Brush.linearGradient(listOf(PurrfectPalette.glowPrimary, PurrfectPalette.glowSecondary)))
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = skin.textPrimary),
+                                    border = BorderStroke(1.dp, Brush.linearGradient(listOf(skin.glowPrimary, skin.glowSecondary)))
                                 ) {
-                                    Text(text = translation["reset_button"], style = MaterialTheme.typography.labelLarge)
+                                    Text(text = translation["reset_button"] ?: "Reset", style = MaterialTheme.typography.labelLarge)
                                 }
                                 Button(
                                     onClick = { openBottomBarCustomization = false },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.White.copy(alpha = 0.08f),
-                                        contentColor = Color.White
+                                        containerColor = skin.textPrimary.copy(alpha = 0.08f),
+                                        contentColor = skin.textPrimary
                                     )
                                 ) {
-                                    Text(text = translation["done_button"], style = MaterialTheme.typography.labelLarge)
+                                    Text(text = translation["done_button"] ?: "Done", style = MaterialTheme.typography.labelLarge)
                                 }
                             }
                         }
@@ -791,13 +813,13 @@ class Navigation(
             }
         }
     }
+
     @Composable
     fun Fab() {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         remember(navBackStackEntry) { routes.getCurrentRoute(navBackStackEntry) }?.floatingActionButton?.invoke()
     }
-    @Composable
-    fun NavContent(paddingValues: PaddingValues, startDestination: String) {
+    @Composable fun NavContent(paddingValues: PaddingValues, startDestination: String) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -810,51 +832,14 @@ class Navigation(
                             route.routeInfo.id == Routes.CONFIG_EXPORT_SUMMARY_ROUTE ||
                             route.routeInfo.id == Routes.FRIEND_TRACKER_CONFIG_EXPORT_ROUTE ||
                             route.routeInfo.id == Routes.FRIEND_TRACKER_CONFIG_IMPORT_ROUTE
-                    val isAddRuleScreen = route.routeInfo.id.startsWith("edit_rule")
                     val animatedRoutes = setOf("friend_tracker_catalog", "manage_friend_tracker_repos", "manage_script_repos", "manage_repos")
                     val isAnimatedRoute = animatedRoutes.contains(route.routeInfo.id)
-                    val addRuleEnterAnimation = slideInHorizontally(animationSpec = tween(400)) { it }
-                    val addRuleExitAnimation = slideOutHorizontally(animationSpec = tween(400)) { -it }
-                    val addRulePopEnterAnimation = slideInHorizontally(animationSpec = tween(400)) { -it }
-                    val addRulePopExitAnimation = slideOutHorizontally(animationSpec = tween(400)) { it }
-                    val animatedRouteEnter = slideInHorizontally(animationSpec = tween(400)) { it }
-                    val animatedRouteExit = slideOutHorizontally(animationSpec = tween(400)) { -it }
-                    val animatedRoutePopEnter = slideInHorizontally(animationSpec = tween(400)) { -it }
-                    val animatedRoutePopExit = slideOutHorizontally(animationSpec = tween(400)) { it }
                     composable(
                         route.routeInfo.id,
-                        enterTransition = {
-                            when {
-                                isSummaryScreen -> slideInHorizontally { it }
-                                isAddRuleScreen -> addRuleEnterAnimation
-                                isAnimatedRoute -> animatedRouteEnter
-                                else -> fadeIn(tween(100))
-                            }
-                        },
-                        exitTransition = {
-                            when {
-                                isSummaryScreen -> slideOutHorizontally { -it }
-                                isAddRuleScreen -> addRuleExitAnimation
-                                isAnimatedRoute -> animatedRouteExit
-                                else -> fadeOut(tween(100))
-                            }
-                        },
-                        popEnterTransition = {
-                            when {
-                                isSummaryScreen -> slideInHorizontally { -it }
-                                isAddRuleScreen -> addRulePopEnterAnimation
-                                isAnimatedRoute -> animatedRoutePopEnter
-                                else -> fadeIn(tween(100))
-                            }
-                        },
-                        popExitTransition = {
-                            when {
-                                isSummaryScreen -> slideOutHorizontally { it }
-                                isAddRuleScreen -> addRulePopExitAnimation
-                                isAnimatedRoute -> animatedRoutePopExit
-                                else -> fadeOut(tween(100))
-                            }
-                        }
+                        enterTransition = { if (isSummaryScreen) slideInHorizontally { it } else if (isAnimatedRoute) slideInHorizontally { it } else fadeIn(tween(100)) },   
+                        exitTransition = { if (isSummaryScreen) slideOutHorizontally { -it } else if (isAnimatedRoute) slideOutHorizontally { -it } else fadeOut(tween(100)) },
+                        popEnterTransition = { if (isSummaryScreen) slideInHorizontally { -it } else if (isAnimatedRoute) slideInHorizontally { -it } else fadeIn(tween(100)) },
+                        popExitTransition = { if (isSummaryScreen) slideOutHorizontally { it } else if (isAnimatedRoute) slideOutHorizontally { it } else fadeOut(tween(100)) }
                     ) { route.content.invoke(it) }
                     route.customComposables.invoke(this)
                 } else {

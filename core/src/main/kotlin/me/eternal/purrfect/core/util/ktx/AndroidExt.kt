@@ -2,7 +2,6 @@ package me.eternal.purrfect.core.util.ktx
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import android.content.res.Resources
 import android.content.res.Resources.Theme
 import android.content.res.TypedArray
@@ -17,12 +16,13 @@ val notFoundCache = mutableSetOf<String>()
 
 @SuppressLint("DiscouragedApi")
 fun Resources.getIdentifier(name: String, type: String): Int {
+    val key = "$type#$name"
+    if (key in notFoundCache) return 0
+
     return getIdentifier(name, type, Constants.SNAPCHAT_PACKAGE_NAME).also { id ->
         if (id != 0) return@also
-        "$type#$name".takeIf { it !in notFoundCache}?.let {
-            AbstractLogger.directDebug("Resource not found: $it")
-            notFoundCache.add(it)
-        }
+        AbstractLogger.directDebug("Resource not found: $key")
+        notFoundCache.add(key)
     }
 }
 
@@ -35,21 +35,27 @@ fun Resources.getLayoutId(name: String): Int {
 }
 
 fun Resources.getDimens(name: String): Int {
-    return getDimensionPixelSize(getIdentifier(name, "dimen").takeIf { it > 0 } ?: return 0)
+    val id = getIdentifier(name, "dimen")
+    if (id <= 0) return 0
+    return getDimensionPixelSize(id)
 }
 
 fun Resources.getDimensFloat(name: String): Float {
-    return getDimension(getIdentifier(name, "dimen").takeIf { it > 0 } ?: return 0F)
+    val id = getIdentifier(name, "dimen")
+    if (id <= 0) return 0F
+    return getDimension(id)
 }
 
-fun Resources.getStyledAttributes(name: String, theme: Theme): TypedArray {
-    return getIdentifier(name, "attr").let {
-        theme.obtainStyledAttributes(intArrayOf(it))
-    }
+fun Resources.getStyledAttributes(name: String, theme: Theme): TypedArray? {
+    val id = getIdentifier(name, "attr")
+    if (id <= 0) return null
+    return theme.obtainStyledAttributes(intArrayOf(id))
 }
 
-fun Resources.getDrawable(name: String, theme: Theme): Drawable {
-    return getDrawable(getIdentifier(name, "drawable"), theme)
+fun Resources.getDrawable(name: String, theme: Theme): Drawable? {
+    val id = getIdentifier(name, "drawable")
+    if (id <= 0) return null
+    return getDrawable(id, theme)
 }
 
 @SuppressLint("MissingPermission")
@@ -58,5 +64,9 @@ fun Context.vibrateLongPress() {
 }
 
 fun Context.isDarkTheme(): Boolean {
-    return (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    return theme.obtainStyledAttributes(
+        intArrayOf(android.R.attr.colorPrimary)
+    ).getColor(0, 0).let {
+        ColorUtils.calculateLuminance(it) < 0.5
+    }
 }

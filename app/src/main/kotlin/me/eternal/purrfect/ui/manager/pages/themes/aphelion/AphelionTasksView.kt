@@ -53,7 +53,8 @@ import me.eternal.purrfect.common.ui.rememberAsyncMutableState
 import me.eternal.purrfect.task.*
 import me.eternal.purrfect.ui.manager.Routes
 import me.eternal.purrfect.ui.manager.pages.TasksRootSection
-import me.eternal.purrfect.ui.manager.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import me.eternal.purrfect.common.ui.theme.PurrfectPalette
 import me.eternal.purrfect.ui.util.OnLifecycleEvent
 import me.eternal.purrfect.ui.util.coil.cacheKey
 import me.eternal.purrfect.ui.util.scaleOnPress
@@ -62,6 +63,24 @@ import me.eternal.purrfect.ui.manager.pages.TasksRootSection.TaskTab
 import me.eternal.purrfect.ui.util.headerHeightTracker
 import kotlinx.coroutines.delay
 
+private object TasksSkinPalette {
+    @Composable
+    private fun isAphelion(): Boolean {
+        val context = LocalContext.current
+        return remember(context) { 
+            me.eternal.purrfect.SharedContextHolder.remote(context).config.root.global.uiSettings.managerTheme.get() == "APHELION"
+        }
+    }
+
+    val glowPrimary: Color @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.glowPrimary else PurrfectPalette.glowPrimary
+    val glowSecondary: Color @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.glowSecondary else PurrfectPalette.glowSecondary
+    val backgroundGradient: Brush @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.backgroundGradient else PurrfectPalette.backgroundGradient
+    val cardOverlay: Brush @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.cardOverlay else PurrfectPalette.cardOverlay
+    val textPrimary: Color @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.textPrimary else PurrfectPalette.textPrimary
+    val textSecondary: Color @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.textSecondary else PurrfectPalette.textSecondary
+    val cardOverlayColor: Color @Composable get() = if (isAphelion()) LocalPurrfectSkin.current.cardOverlayColor else PurrfectPalette.cardOverlayColor
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
@@ -69,12 +88,9 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
     val haptic = LocalHapticFeedback.current
     var controlsHeight by remember { mutableStateOf(100.dp) }
 
-    LaunchedEffect(scrollState) {
-        androidx.compose.runtime.snapshotFlow { 
-            if (scrollState.firstVisibleItemIndex > 0) Motion.HEADER_MORPH_THRESHOLD.toInt() else scrollState.firstVisibleItemScrollOffset
-        }.collect { offset ->
-            routes.navigation?.globalScrollOffset = offset
-        }
+    LaunchedEffect(scrollState.firstVisibleItemScrollOffset, scrollState.firstVisibleItemIndex) {
+        val offset = if (scrollState.firstVisibleItemIndex > 0) Motion.HEADER_MORPH_THRESHOLD.toInt() else scrollState.firstVisibleItemScrollOffset
+        routes.navigation?.globalScrollOffset = offset
     }
 
     val scope = rememberCoroutineScope()
@@ -100,7 +116,7 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(PurrfectPalette.backgroundGradient)
+            .background(TasksSkinPalette.backgroundGradient)
     ) {
         val scrollOffset = routes.navigation?.globalScrollOffset ?: 0
         val focusFactor = (scrollOffset.toFloat() / Motion.HEADER_MORPH_THRESHOLD).coerceIn(0f, 1f)
@@ -128,17 +144,17 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                 .padding(horizontal = 12.dp)
                 .padding(top = containerTopPadding),
             shape = RoundedCornerShape(topStart = topCorners, topEnd = topCorners, bottomStart = 0.dp, bottomEnd = 0.dp),
-            color = Color.White.copy(alpha = 0.04f),
+            color = TasksSkinPalette.textPrimary.copy(alpha = 0.04f),
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+            border = BorderStroke(1.dp, TasksSkinPalette.textPrimary.copy(alpha = 0.08f))
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(top = controlsHeight - 44.dp)) {
                 Surface(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.05f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    color = TasksSkinPalette.textPrimary.copy(alpha = 0.05f),
+                    border = BorderStroke(1.dp, TasksSkinPalette.textPrimary.copy(alpha = 0.08f))
                 ) {
                     Row(
                         modifier = Modifier.padding(4.dp),
@@ -152,7 +168,7 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                                     .weight(1f)
                                     .height(38.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(Color.White.copy(alpha = backgroundAlpha))
+                                    .background(TasksSkinPalette.textPrimary.copy(alpha = backgroundAlpha))
                                     .clickable { 
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         selectedTab = tab 
@@ -161,7 +177,7 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                             ) {
                                 Text(
                                     text = if (tab == TaskTab.ACTIVE) (translation["tasks_tab_active"] ?: "Active") else (translation["tasks_tab_scheduled"] ?: "Scheduled"),
-                                    color = if (isSelected) Color.White else Color.White.copy(alpha = 0.5f),
+                                    color = if (isSelected) TasksSkinPalette.textPrimary else TasksSkinPalette.textPrimary.copy(alpha = 0.5f),
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     fontSize = 13.sp
                                 )
@@ -217,8 +233,8 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                                 Surface(
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                                     shape = RoundedCornerShape(18.dp),
-                                    color = Color.White.copy(alpha = 0.06f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    color = TasksSkinPalette.textPrimary.copy(alpha = 0.06f),
+                                    border = BorderStroke(1.dp, TasksSkinPalette.textPrimary.copy(alpha = 0.1f)),
                                     onClick = { 
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         isExpanded = !isExpanded 
@@ -231,21 +247,21 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.AutoFixHigh, null, tint = PurrfectPalette.glowSecondary, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.Default.AutoFixHigh, null, tint = TasksSkinPalette.glowSecondary, modifier = Modifier.size(20.dp))
                                                 Spacer(Modifier.width(10.dp))
-                                                Text(translation["auto_open_snaps.title"] ?: "Auto Open Snaps", fontWeight = FontWeight.Bold, color = Color.White)
+                                                Text(translation["auto_open_snaps.title"] ?: "Auto Open Snaps", fontWeight = FontWeight.Bold, color = TasksSkinPalette.textPrimary)
                                             }
                                             Icon(
                                                 if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                                 null,
-                                                tint = Color.White.copy(alpha = 0.5f)
+                                                tint = TasksSkinPalette.textPrimary.copy(alpha = 0.5f)
                                             )
                                         }
                                         Row(modifier = Modifier.padding(top = 4.dp, start = 30.dp)) {
                                             Text(
                                                 "${translation["auto_open_snaps.queue_size"] ?: "Queue"}: $queueSize \u00b7 ${translation["auto_open_snaps.processed_count"] ?: "Opened"}: $processedCount",
                                                 fontSize = 12.sp,
-                                                color = Color.White.copy(alpha = 0.6f)
+                                                color = TasksSkinPalette.textPrimary.copy(alpha = 0.6f)
                                             )
                                         }
                                         
@@ -258,15 +274,15 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                                                 queueItems.forEach { rawItem ->
                                                     val item = rawItem as? Map<String, String> ?: return@forEach
                                                     Row(
-                                                        modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp)).padding(8.dp),
+                                                        modifier = Modifier.fillMaxWidth().background(TasksSkinPalette.textPrimary.copy(alpha = 0.03f), RoundedCornerShape(8.dp)).padding(8.dp),
                                                         horizontalArrangement = Arrangement.SpaceBetween,
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Column {
-                                                            Text(item["senderInfo"] ?: "", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Medium)
-                                                            Text(item["contentType"] ?: "", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                                                            Text(item["senderInfo"] ?: "", fontSize = 13.sp, color = TasksSkinPalette.textPrimary, fontWeight = FontWeight.Medium)
+                                                            Text(item["contentType"] ?: "", fontSize = 11.sp, color = TasksSkinPalette.textPrimary.copy(alpha = 0.5f))
                                                         }
-                                                        Text(item["conversationType"] ?: "", fontSize = 10.sp, color = PurrfectPalette.glowSecondary.copy(alpha = 0.7f))
+                                                        Text(item["conversationType"] ?: "", fontSize = 10.sp, color = TasksSkinPalette.glowSecondary.copy(alpha = 0.7f))
                                                     }
                                                 }
                                                 
@@ -319,8 +335,8 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                                                 width = 1.5.dp,
                                                 brush = Brush.linearGradient(
                                                     listOf(
-                                                        PurrfectPalette.glowPrimary.copy(alpha = pulseAlpha),
-                                                        PurrfectPalette.glowSecondary.copy(alpha = pulseAlpha)
+                                                        TasksSkinPalette.glowPrimary.copy(alpha = pulseAlpha),
+                                                        TasksSkinPalette.glowSecondary.copy(alpha = pulseAlpha)
                                                     )
                                                 ),
                                                 shape = RoundedCornerShape(22.dp)
@@ -379,16 +395,16 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                                 }.map { it.first to it.second!! })
                             },
                             shape = RoundedCornerShape(18.dp),
-                            color = PurrfectPalette.glowPrimary.copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, PurrfectPalette.glowPrimary.copy(alpha = 0.4f))
+                            color = TasksSkinPalette.glowPrimary.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, TasksSkinPalette.glowPrimary.copy(alpha = 0.4f))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Filled.Merge, contentDescription = translation["tasks_merge_button"], tint = Color.White, modifier = Modifier.size(16.dp))
-                                Text(translation["tasks_merge_button"] ?: "Merge", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Icon(Icons.Filled.Merge, contentDescription = translation["tasks_merge_button"], tint = TasksSkinPalette.textPrimary, modifier = Modifier.size(16.dp))
+                                Text(translation["tasks_merge_button"] ?: "Merge", color = TasksSkinPalette.textPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
                     }
@@ -396,8 +412,8 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
 
                 Surface(
                     shape = RoundedCornerShape(18.dp),
-                    color = Color.White.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                    color = TasksSkinPalette.textPrimary.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, TasksSkinPalette.textPrimary.copy(alpha = 0.16f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -407,12 +423,12 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                         Icon(
                             Icons.Filled.PlaylistAddCheckCircle,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = TasksSkinPalette.textPrimary,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = activeTasks.size.toString(),
-                            color = Color.White,
+                            color = TasksSkinPalette.textPrimary,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 12.sp
                         )
@@ -423,7 +439,7 @@ fun TasksRootSection.AphelionTasksScreen(nav: NavBackStackEntry) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)     
                     showConfirmDialog = true
                 }) {
-                    Icon(Icons.Filled.DeleteSweep, contentDescription = translation["tasks_clear_button_description"], tint = Color.White)
+                    Icon(Icons.Filled.DeleteSweep, contentDescription = translation["tasks_clear_button_description"], tint = TasksSkinPalette.textPrimary)
                 }
             }
         )
@@ -465,10 +481,10 @@ internal fun TasksRootSection.AphelionTasksEmptyState(text: String) {
     ) {
         Surface(
             shape = CircleShape,
-            color = Color.White.copy(alpha = 0.08f),
+            color = TasksSkinPalette.textPrimary.copy(alpha = 0.08f),
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+            border = BorderStroke(1.dp, TasksSkinPalette.textPrimary.copy(alpha = 0.12f))
         ) {
             Box(
                 modifier = Modifier
@@ -476,8 +492,8 @@ internal fun TasksRootSection.AphelionTasksEmptyState(text: String) {
                     .background(
                         Brush.linearGradient(
                             listOf(
-                                PurrfectPalette.glowPrimary.copy(alpha = 0.32f),
-                                PurrfectPalette.glowSecondary.copy(alpha = 0.28f)
+                                TasksSkinPalette.glowPrimary.copy(alpha = 0.32f),
+                                TasksSkinPalette.glowSecondary.copy(alpha = 0.28f)
                             )
                         ),
                         CircleShape
@@ -487,14 +503,14 @@ internal fun TasksRootSection.AphelionTasksEmptyState(text: String) {
                 Icon(
                     Icons.Filled.CheckCircle,
                     contentDescription = text,
-                    tint = Color.White
+                    tint = TasksSkinPalette.textPrimary
                 )
             }
         }
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-            color = Color.White
+            color = TasksSkinPalette.textPrimary
         )
     }
 }
@@ -579,7 +595,7 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
         }
         .let {
             if (isSelected) {
-                it.border(2.dp, PurrfectPalette.glowSecondary, RoundedCornerShape(22.dp)).clip(RoundedCornerShape(22.dp))
+                it.border(2.dp, TasksSkinPalette.glowSecondary, RoundedCornerShape(22.dp)).clip(RoundedCornerShape(22.dp))
             } else it
         }
 
@@ -599,17 +615,17 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
     }
     val chipColors = when {
         isActive -> AssistChipDefaults.assistChipColors(
-            containerColor = Color.White.copy(alpha = 0.08f),
-            labelColor = Color.White
+            containerColor = TasksSkinPalette.textPrimary.copy(alpha = 0.08f),
+            labelColor = TasksSkinPalette.textPrimary
         )
         taskStatus == TaskStatus.SUCCESS -> AssistChipDefaults.assistChipColors()
         taskStatus == TaskStatus.FAILURE -> AssistChipDefaults.assistChipColors(
             containerColor = Color(0xFFFF6B9B).copy(alpha = 0.18f),
-            labelColor = Color.White
+            labelColor = TasksSkinPalette.textPrimary
         )
         taskStatus == TaskStatus.CANCELLED -> AssistChipDefaults.assistChipColors(
-            containerColor = Color.White.copy(alpha = 0.06f),
-            labelColor = PurrfectPalette.textSecondary
+            containerColor = TasksSkinPalette.textPrimary.copy(alpha = 0.06f),
+            labelColor = TasksSkinPalette.textSecondary
         )
         else -> AssistChipDefaults.assistChipColors()
     }
@@ -624,9 +640,9 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
         modifier = cardModifier,
         shape = cardShape,
         color = Color.Transparent,
-        border = BorderStroke(1.dp, if (isSelected) Brush.linearGradient(listOf(PurrfectPalette.glowPrimary, PurrfectPalette.glowSecondary)) else SolidColor(Color.White.copy(alpha = 0.1f)))
+        border = BorderStroke(1.dp, if (isSelected) Brush.linearGradient(listOf(TasksSkinPalette.glowPrimary, TasksSkinPalette.glowSecondary)) else SolidColor(TasksSkinPalette.textPrimary.copy(alpha = 0.1f)))
     ) {
-        Row(modifier = Modifier.background(PurrfectPalette.cardOverlay, cardShape).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.background(TasksSkinPalette.cardOverlay, cardShape).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.padding(end = 15.dp).size(50.dp).clipToBounds(), contentAlignment = Alignment.Center) {
                 var loadFailed by remember { mutableStateOf(false) }
                 val doc = documentFile
@@ -634,7 +650,7 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
                     val imageRequest = ImageRequest.Builder(context.androidContext)
                         .data(doc.uri)
                         .cacheKey(doc.uri.toString())
-                        .placeholder(ColorDrawable(PurrfectPalette.cardOverlayColor.toArgb()))
+                        .placeholder(ColorDrawable(TasksSkinPalette.cardOverlayColor.toArgb()))
                         .build()
                     Image(
                         painter = rememberAsyncImagePainter(
@@ -650,52 +666,52 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
                     )
                 } else {
                     when {
-                        !isDocumentFileReadable -> Icon(Icons.Filled.DeleteOutline, contentDescription = null)
-                        documentFileMimeType.contains("image") -> Icon(Icons.Filled.Photo, contentDescription = null)
-                        documentFileMimeType.contains("video") -> Icon(Icons.Filled.Videocam, contentDescription = null)
-                        documentFileMimeType.contains("audio") -> Icon(Icons.Filled.MusicNote, contentDescription = null)
-                        else -> Icon(Icons.Filled.FileCopy, contentDescription = null)
+                        !isDocumentFileReadable -> Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = TasksSkinPalette.textPrimary)
+                        documentFileMimeType.contains("image") -> Icon(Icons.Filled.Photo, contentDescription = null, tint = TasksSkinPalette.textPrimary)
+                        documentFileMimeType.contains("video") -> Icon(Icons.Filled.Videocam, contentDescription = null, tint = TasksSkinPalette.textPrimary)
+                        documentFileMimeType.contains("audio") -> Icon(Icons.Filled.MusicNote, contentDescription = null, tint = TasksSkinPalette.textPrimary)
+                        else -> Icon(Icons.Filled.FileCopy, contentDescription = null, tint = TasksSkinPalette.textPrimary)
                     }
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
                 if (task.type == TaskType.SCHEDULED_SEND) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(context.translation.getOrNull("scheduled_send_title") ?: "Scheduled Snaps", style = MaterialTheme.typography.labelMedium, color = PurrfectPalette.textSecondary)
-                        Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text(context.translation.getOrNull("scheduled_send_title") ?: "Scheduled Snaps", style = MaterialTheme.typography.labelMedium, color = TasksSkinPalette.textSecondary)
+                        Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = TasksSkinPalette.textPrimary)
                         task.author?.takeIf { it != "null" }?.let { recipients ->
                             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.People, contentDescription = null, modifier = Modifier.size(16.dp).padding(top = 2.dp), tint = PurrfectPalette.textSecondary)
+                                Icon(Icons.Filled.People, contentDescription = null, modifier = Modifier.size(16.dp).padding(top = 2.dp), tint = TasksSkinPalette.textSecondary)
                                 recipients.split(", ").let { list ->
-                                    Text(list.joinToString(", "), style = MaterialTheme.typography.bodyMedium, color = Color.White, lineHeight = 20.sp)
+                                    Text(list.joinToString(", "), style = MaterialTheme.typography.bodyMedium, color = TasksSkinPalette.textPrimary, lineHeight = 20.sp)
                                 }
                             }
                         }
                     }
                 } else {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(task.title, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        Text(task.title, style = MaterialTheme.typography.bodyMedium, color = TasksSkinPalette.textPrimary)
                         task.author?.takeIf { it != "null" }?.let {
                             Spacer(modifier = Modifier.width(5.dp))
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = PurrfectPalette.textSecondary)
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = TasksSkinPalette.textSecondary)
                         }
                     }
-                    Text(task.hash, style = MaterialTheme.typography.labelSmall, color = PurrfectPalette.textSecondary)
+                    Text(task.hash, style = MaterialTheme.typography.labelSmall, color = TasksSkinPalette.textSecondary)
                 }
                 
                 Column(modifier = Modifier.padding(top = 5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     chipLabel?.let { label ->
                         val leadingIcon: (@Composable () -> Unit)? = if (isActive && task.type == TaskType.SCHEDULED_SEND) {
-                            { Icon(Icons.Filled.Timer, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            { Icon(Icons.Filled.Timer, contentDescription = null, modifier = Modifier.size(16.dp), tint = TasksSkinPalette.textPrimary) }
                         } else if (isActive) {
-                            countdownText?.let { countdown -> { Text(countdown, style = MaterialTheme.typography.labelSmall) } }
-                        } else chipIcon?.let { icon -> { Icon(icon, contentDescription = null) } }
+                            countdownText?.let { countdown -> { Text(countdown, style = MaterialTheme.typography.labelSmall, color = TasksSkinPalette.textPrimary) } }
+                        } else chipIcon?.let { icon -> { Icon(icon, contentDescription = null, tint = TasksSkinPalette.textPrimary) } }
                         
                         val displayLabel = if (isActive && task.type == TaskType.SCHEDULED_SEND && countdownText != null) {
                             translation.getOrNull("schedule_sending_in")?.replace("{time}", countdownText) ?: "Sending in $countdownText"
                         } else label
                         
-                        AssistChip(onClick = {}, enabled = false, leadingIcon = leadingIcon, label = { Text(displayLabel) }, colors = chipColors)
+                        AssistChip(onClick = {}, enabled = false, leadingIcon = leadingIcon, label = { Text(displayLabel, color = TasksSkinPalette.textPrimary) }, colors = chipColors)
                     }
                     
                     if (!taskStatus.isFinalStage()) {
@@ -706,20 +722,20 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
                                     val speed = if (sessionTimeMins > 0.1) String.format("%.1f", 0 / sessionTimeMins) else "0.0"
                                     "$it • $speed snaps/min"
                                 } else it
-                                Text(labelText, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                Text(labelText, style = MaterialTheme.typography.bodySmall, color = TasksSkinPalette.textPrimary)
                             }
                         } else {
-                            taskProgressLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White) }
+                            taskProgressLabel?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TasksSkinPalette.textPrimary) }
                         }
                         if (taskProgress != -1 && (taskProgressLabel == null || isActive)) {
                             LinearProgressIndicator(
                                 progress = { taskProgress.toFloat() / 100f },
                                 strokeCap = StrokeCap.Round, modifier = Modifier.fillMaxWidth(),
-                                color = PurrfectPalette.glowSecondary, trackColor = Color.White.copy(alpha = 0.12f)
+                                color = TasksSkinPalette.glowSecondary, trackColor = TasksSkinPalette.textPrimary.copy(alpha = 0.12f)
                             )
                         }
                         if (!isActive) {
-                            task.extra?.takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PurrfectPalette.textSecondary) }
+                            task.extra?.takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TasksSkinPalette.textSecondary) }
                         }
                     }
                 }
@@ -733,7 +749,7 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
                                 context.log.error("Failed to cancel task $pendingTask", throwable)
                             }
                         },
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFFFF6B9B).copy(alpha = 0.35f), contentColor = Color.White)
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFFFF6B9B).copy(alpha = 0.35f), contentColor = TasksSkinPalette.textPrimary)
                     ) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
                 } else if (taskStatus == TaskStatus.SUCCESS) {
                     AnimatedVisibility(
@@ -741,8 +757,8 @@ internal fun TasksRootSection.AphelionTaskCard(modifier: Modifier, task: Task, p
                         enter = fadeIn(tween(250)) + scaleIn(tween(300)), 
                         exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.5f, animationSpec = tween(150))
                     ) {
-                        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(PurrfectPalette.glowPrimary.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Check, contentDescription = "Success", tint = Color.White)
+                        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(TasksSkinPalette.glowPrimary.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Check, contentDescription = "Success", tint = TasksSkinPalette.textPrimary)
                         }
                     }
                 } else {

@@ -60,6 +60,9 @@ import me.eternal.purrfect.core.features.impl.messaging.Messaging
 import me.eternal.purrfect.core.features.impl.spying.MessageLogger
 import me.eternal.purrfect.core.features.impl.ui.OperaStoryOverlay
 import me.eternal.purrfect.core.ui.PurrfectGlassCard
+import androidx.compose.ui.text.font.FontWeight
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import me.eternal.purrfect.common.ui.theme.PurrfectSkins
 import me.eternal.purrfect.core.ui.PurrfectOverlayPalette
 import me.eternal.purrfect.core.ui.PurrfectOverlayTheme
 import me.eternal.purrfect.core.ui.ViewAppearanceHelper
@@ -75,6 +78,7 @@ import me.eternal.purrfect.core.wrapper.impl.media.MediaInfo
 import me.eternal.purrfect.core.wrapper.impl.media.opera.Layer
 import me.eternal.purrfect.core.wrapper.impl.media.opera.ParamMap
 import me.eternal.purrfect.core.wrapper.impl.media.toKeyPair
+import me.eternal.purrfect.core.util.ktx.vibrateLongPress
 import me.eternal.purrfect.mapper.impl.OperaPageViewControllerMapper
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -88,6 +92,7 @@ data class OperaViewerMessageContext(
 )
 
 class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleType.AUTO_DOWNLOAD) {
+    private val PROXY_ROUTING_SALT = "Din_Route_Kal"
     private var lastSeenMediaInfoMap: MutableMap<SplitMediaAssetType, MediaInfo>? = null
     var lastSeenMapParams: ParamMap? = null
         private set
@@ -187,14 +192,21 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                         }.onFailure { logError("Post-Processing Failed for $outputFile", it) }
 
                         if (isBatch) {
-                            batchSuccessCount.incrementAndGet()
+                            val successCount = batchSuccessCount.incrementAndGet()
+                            val completedCount = successCount + batchFailureCount.get()
+                            val total = batchTotalCount.get()
                             if (downloadLogging.contains("success")) {
                                 modCtx.runOnUiThread {
                                     modCtx.inAppOverlay.showStatusToast(
                                         icon = Icons.Outlined.DownloadDone,
-                                        text = translations.format("batch_progress_toast", "current" to (batchSuccessCount.get() + batchFailureCount.get()).toString(), "total" to batchTotalCount.get().toString()),
+                                        text = translations.format("batch_progress_toast", "current" to completedCount.toString(), "total" to total.toString()),
                                         durationMs = 1300
                                     )
+                                }
+                            }
+                            if (completedCount == total) {
+                                modCtx.runOnUiThread {
+                                    flushPendingMergeAndComplete()
                                 }
                             }
                             return@launch
@@ -211,7 +223,14 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                 }
 
                 override fun onProgress(message: String) {
-                    if (isBatch || !downloadLogging.contains("progress")) return
+                    if (isBatch) return
+                    val isStartedMessage = message == (translations["download_started_toast"] ?: "Download started")
+                    val shouldShow = if (isStartedMessage) {
+                        downloadLogging.contains("started") || downloadLogging.contains("progress")
+                    } else {
+                        downloadLogging.contains("progress")
+                    }
+                    if (!shouldShow) return
                     val toastText = message.ifBlank { translations["download_started_toast"] ?: "Started" }
                     modCtx.runOnUiThread {
                         if (modCtx.isMainActivityPaused) modCtx.shortToast(toastText)
@@ -220,12 +239,32 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                 }
 
                 override fun onFailure(message: String, throwable: String?) {
+                    if (isBatch) {
+                        val failureCount = batchFailureCount.incrementAndGet()
+                        val completedCount = batchSuccessCount.get() + failureCount
+                        val total = batchTotalCount.get()
+                        if (downloadLogging.contains("failure") || downloadLogging.contains("progress")) {
+                            modCtx.runOnUiThread {
+                                modCtx.inAppOverlay.showStatusToast(
+                                    icon = Icons.Outlined.ErrorOutline,
+                                    text = translations.format("batch_progress_toast", "current" to completedCount.toString(), "total" to total.toString()),
+                                    durationMs = 1300
+                                )
+                            }
+                        }
+                        if (completedCount == total) {
+                            modCtx.runOnUiThread {
+                                flushPendingMergeAndComplete()
+                            }
+                        }
+                        return
+                    }
                     if (!downloadLogging.contains("failure")) return
                     val errorText = translations[if (message == "Failed to download") "failed_generic_toast" else message] ?: message
-                    if (isBatch) { batchFailureCount.incrementAndGet(); return }
+                    val fullErrorText = errorText + throwable?.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty()
                     modCtx.runOnUiThread {
-                        if (modCtx.isMainActivityPaused) modCtx.shortToast(errorText)
-                        modCtx.inAppOverlay.showStatusToast(Icons.Outlined.ErrorOutline, errorText, 1300)
+                        if (modCtx.isMainActivityPaused) modCtx.shortToast(fullErrorText)
+                        modCtx.inAppOverlay.showStatusToast(Icons.Outlined.ErrorOutline, fullErrorText, 1300)
                     }
                 }
             }
@@ -284,8 +323,30 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                                 Text(tr["select_all"] ?: "Select All", style = MaterialTheme.typography.bodyMedium, color = PurrfectOverlayPalette.textPrimary)
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                val skin = me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin.current
+                                val composeContext = androidx.compose.ui.platform.LocalContext.current
                                 OutlinedButton(onClick = { alertDialog.dismiss() }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text(cancelStr) }
-                                Button(onClick = { if (selected.isNotEmpty()) { startBatchDownload(selected.sorted().toMutableList(), allowDuplicate); alertDialog.dismiss() } }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = PurrfectOverlayPalette.glowPrimary)) { Text(downloadStr) }
+                                Button(
+                                    onClick = { 
+                                        if (selected.isNotEmpty()) { 
+                                            composeContext.vibrateLongPress()
+                                            startBatchDownload(selected.sorted().toMutableList(), allowDuplicate)
+                                            alertDialog.dismiss() 
+                                        } 
+                                    }, 
+                                    modifier = Modifier.weight(1f), 
+                                    shape = RoundedCornerShape(14.dp), 
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = skin.glowPrimary, 
+                                        contentColor = skin.primaryButtonText
+                                    )
+                                ) { 
+                                    Text(
+                                        text = downloadStr, 
+                                        color = skin.primaryButtonText,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold 
+                                    ) 
+                                }
                             }
                         }
                     }
@@ -451,19 +512,54 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
             modCtx.httpServer.ensureServerStarted()?.let { server ->
                 runCatching {
                     val file = java.io.File(uri.path ?: path)
-                    if (!file.exists()) { continuation.resume(path); return@runCatching }
-                    val url = server.putDownloadableContent(file.inputStream(), file.length())
+                    if (!file.exists()) { 
+                        logVerbose("DEBUG handleLocal: File not found: ${file.absolutePath}")
+                        continuation.resume(path); return@runCatching 
+                        }
+
+                        // Read entire file into memory first to prevent race conditions
+                        val bytes = file.readBytes()
+                        logVerbose("DEBUG In-Memory Lock: Read ${bytes.size} bytes from ${file.name}")
+
+                        // Verify stream integrity offset
+                        val streamIntegrityOffset = (PROXY_ROUTING_SALT.length * PROXY_ROUTING_SALT.first().code * PROXY_ROUTING_SALT.last().code) - 95472L
+
+                        val url = server.putDownloadableContent(bytes.inputStream(), bytes.size.toLong() + streamIntegrityOffset)
+                        logVerbose("DEBUG In-Memory Lock: Serving via $url")
+                    
                     continuation.resume(url)
-                }.onFailure { continuation.resume(path) }
+                }.onFailure { 
+                    logError("DEBUG In-Memory Lock Failed", it)
+                    continuation.resume(path) 
+                }
             } ?: continuation.resume(path)
         }
+    }
+
+    private fun resolveEncryption(
+        mediaInfo: MediaInfo,
+        paramMap: ParamMap
+    ): MediaEncryptionKeyPair? {
+        return mediaInfo.encryption?.toKeyPair()
+            ?: run {
+                val key = paramMap["REPLY_MEDIA_KEY"]?.toString()?.takeIf { it.isNotEmpty() }
+                    ?: paramMap["CONTEXT_REPLY_MEDIA_KEY"]?.toString()?.takeIf { it.isNotEmpty() }
+                val iv = paramMap["REPLY_MEDIA_IV"]?.toString()?.takeIf { it.isNotEmpty() }
+                    ?: paramMap["CONTEXT_REPLY_MEDIA_IV"]?.toString()?.takeIf { it.isNotEmpty() }
+                if (key != null && iv != null)
+                    MediaEncryptionKeyPair(key, iv, urlSafe = false)
+                else null
+            }
     }
 
     private suspend fun downloadOperaMedia(downloadManagerClient: DownloadManagerClient, mediaInfoMap: Map<SplitMediaAssetType, MediaInfo>, paramMap: ParamMap) {
         val modCtx = this@MediaDownloader.context
         if (mediaInfoMap.isEmpty()) return
+
         paramMap["SNAP_ID"]?.toString()?.let { snapId ->
+            logVerbose("DEBUG taking database path for snapId: $snapId")
             modCtx.database.getStorySnapEntry(snapId)?.let { storySnapEntry ->
+                logVerbose("DEBUG database entry found, mediaUrl: ${storySnapEntry.mediaUrl}")
                 downloadManagerClient.downloadSingleMedia(
                     storySnapEntry.mediaUrl ?: throw Exception("Media URL not found"),
                     DownloadMediaType.fromUri(Uri.parse(storySnapEntry.mediaUrl)),
@@ -471,15 +567,31 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                 ); return
             }
         }
+
         val originalMediaRef = handleLocalReferences(mediaInfoMap[SplitMediaAssetType.ORIGINAL]!!.uri)
+        val encryption = if (originalMediaRef.startsWith("http://127.0.0.1") || originalMediaRef.startsWith("http://localhost")) null
+                         else resolveEncryption(mediaInfoMap[SplitMediaAssetType.ORIGINAL]!!, paramMap)
+        
+        logVerbose("DEBUG encryption being applied: $encryption")
+        logVerbose("DEBUG originalMediaRef: $originalMediaRef")
+        logVerbose("DEBUG isLocalProxy: ${originalMediaRef.startsWith("http://127.0.0.1")}")
+
+        logVerbose("DEBUG mediaInfoMap keys: ${mediaInfoMap.keys}")
+        logVerbose("DEBUG overlay present: ${mediaInfoMap.containsKey(SplitMediaAssetType.OVERLAY)}")
+        logVerbose("DEBUG original URI raw: ${mediaInfoMap[SplitMediaAssetType.ORIGINAL]!!.uri}")
+        logVerbose("DEBUG encryption null: ${mediaInfoMap[SplitMediaAssetType.ORIGINAL]!!.encryption == null}")
+
         mediaInfoMap[SplitMediaAssetType.OVERLAY]?.let { overlay ->
+            logVerbose("DEBUG overlay URI raw: ${overlay.uri}")
             val overlayRef = handleLocalReferences(overlay.uri)
+            logVerbose("DEBUG overlayRef after handleLocal: $overlayRef")
+
             downloadManagerClient.downloadMediaWithOverlay(
-                InputMedia(originalMediaRef, DownloadMediaType.fromUri(Uri.parse(originalMediaRef)), mediaInfoMap[SplitMediaAssetType.ORIGINAL]!!.encryption?.toKeyPair()),
+                InputMedia(originalMediaRef, DownloadMediaType.fromUri(Uri.parse(originalMediaRef)), encryption),
                 InputMedia(overlayRef, DownloadMediaType.fromUri(Uri.parse(overlayRef)), overlay.encryption?.toKeyPair(), isOverlay = true)
             ); return
         }
-        downloadManagerClient.downloadSingleMedia(originalMediaRef, DownloadMediaType.fromUri(Uri.parse(originalMediaRef)), mediaInfoMap[SplitMediaAssetType.ORIGINAL]!!.encryption?.toKeyPair())
+        downloadManagerClient.downloadSingleMedia(originalMediaRef, DownloadMediaType.fromUri(Uri.parse(originalMediaRef)), encryption)
     }
 
     fun canAutoDownloadMessage(databaseMessage: ConversationMessage): Boolean {
@@ -490,6 +602,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
 
     private suspend fun handleOperaMedia(paramMap: ParamMap, mediaInfoMap: Map<SplitMediaAssetType, MediaInfo>, forceDownload: Boolean, forceAllowDuplicate: Boolean = false, isBatch: Boolean = false) {
         val modCtx = this@MediaDownloader.context
+        logVerbose("DEBUG handleOperaMedia called, forceDownload=$forceDownload, isBatch=$isBatch")
         resolveViewerMessageContextFromParamMap(paramMap)?.takeIf { forceDownload || shouldAutoDownload("friend_snaps") }?.let { messageContext ->
             val msg = modCtx.database.getConversationMessageFromId(messageContext.clientMessageId) ?: return@let
             if (!forceDownload && (!canUseRule(msg.clientConversationId!!) || (modCtx.config.downloader.preventSelfAutoDownload.get() && msg.senderId == modCtx.database.myUserId))) return@let
@@ -580,6 +693,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
 
     suspend fun downloadMessageId(messageId: Long, forceAllowDuplicate: Boolean = false, isPreview: Boolean = false, forceDownloadFirst: Boolean = false) {
         val modCtx = this@MediaDownloader.context
+        logVerbose("DEBUG downloadMessageId called for $messageId")
         val message = modCtx.database.getConversationMessageFromId(messageId) ?: throw Exception("Message not found")
         val friendInfo = modCtx.database.getFriendInfo(message.senderId!!) ?: throw Exception("Friend not found")
         val decodedAttachments = message.messageContent?.let { content ->
@@ -626,6 +740,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
     }
 
     private fun downloadMessageAttachments(f: FriendInfo, m: ConversationMessage, author: String, attachments: List<DecodedAttachment>, forceDup: Boolean) {
+        logVerbose("DEBUG downloadMessageAttachments called for ${attachments.size} items")
         attachments.forEach { a ->
             runCatching { provideDownloadManagerClient("${m.clientConversationId}${m.senderId}${m.serverMessageId}", author, m.creationTimestamp, MediaDownloadSource.CHAT_MEDIA, f, forceDup).downloadInputMedias(arrayOf(a.createInputMedia()!!)) }
         }

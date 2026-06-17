@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
@@ -80,6 +81,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -100,7 +103,10 @@ import me.eternal.purrfect.common.ui.AppMaterialTheme
 import me.eternal.purrfect.ui.manager.ManagerAssistantDialog
 import me.eternal.purrfect.ui.manager.Routes
 import me.eternal.purrfect.ui.manager.components.AestheticDialog
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import me.eternal.purrfect.common.ui.theme.AphelionSkinProvider
 import me.eternal.purrfect.ui.manager.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.util.G2RoundedRectangle
 import me.eternal.purrfect.ui.setup.screens.LocalSetupScrollState
 import me.eternal.purrfect.ui.setup.screens.LocalSetupViewportHeight
 import me.eternal.purrfect.ui.setup.screens.SetupScreen
@@ -113,6 +119,7 @@ import me.eternal.purrfect.ui.setup.screens.impl.PatchSnapchatScreen
 import me.eternal.purrfect.ui.setup.screens.impl.RootInstallSnapchatScreen
 import me.eternal.purrfect.ui.setup.screens.impl.SaveFolderScreen
 import me.eternal.purrfect.ui.setup.screens.impl.IntroShowcaseScreen
+import me.eternal.purrfect.ui.setup.screens.impl.ThemeSelectorScreen
 import me.eternal.purrfect.ui.setup.screens.impl.parseSetupTargetApps
 import me.eternal.purrfect.ui.setup.screens.impl.toSetupTargetPrefsValue
 import me.eternal.purrfect.ui.util.ActivityLauncherHelper
@@ -211,6 +218,9 @@ class SetupActivity : ComponentActivity() {
         }
 
         val requiredScreens = mutableListOf<SetupScreen>().apply {
+            if (isFirstRunFlow) {
+                add(ThemeSelectorScreen().apply { route = "themeSelector" })
+            }
             if (isFirstRunFlow || hasRequirement(Requirements.LANGUAGE)) {
                 add(PickLanguageScreen().apply { route = "language" })
                 if (isFirstRunFlow) {
@@ -297,7 +307,9 @@ class SetupActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
-            val translation = setupContext.translation
+            AphelionSkinProvider(context = context) {
+                val skin = LocalPurrfectSkin.current
+                val translation = setupContext.translation
             val navController = rememberNavController()
             var canGoNext by remember { mutableStateOf(false) }
             var lastRoute by rememberSaveable { mutableStateOf("") }
@@ -307,6 +319,9 @@ class SetupActivity : ComponentActivity() {
                         ?: requiredScreens.first().route
                 )
             }
+            var skipAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+            var skipLabel by remember { mutableStateOf<String?>(null) }
+
             val skipPatch by rememberSaveable { skipPatchChoice }
             val installMode by installModeChoice
             val selectedApps by selectedAppsChoice
@@ -389,6 +404,8 @@ class SetupActivity : ComponentActivity() {
                 }
                 if (lastRoute != currentRoute) {
                     canGoNext = false
+                    skipAction = null
+                    skipLabel = null
                     lastRoute = currentRoute
                 }
             }
@@ -455,11 +472,12 @@ class SetupActivity : ComponentActivity() {
                             .padding(
                                 start = 16.dp,
                                 end = 16.dp,
-                                top = 110.dp,
+                                top = 98.dp,
                                 bottom = bottomPadding
                             )
                             .statusBarsPadding(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         SetupHeader(
                             currentStep = stepMeta[currentStepIndex],
@@ -491,6 +509,12 @@ class SetupActivity : ComponentActivity() {
                                         if (screenRoute != currentRoute) return@goNext
                                         canGoNext = true
                                         nextScreen()
+                                    }
+                                    screen.showSkip = { label, action ->
+                                        if (screenRoute == currentRoute) {
+                                            skipLabel = label
+                                            skipAction = action
+                                        }
                                     }
                                     composable(
                                         screen.route,
@@ -534,15 +558,27 @@ class SetupActivity : ComponentActivity() {
                         }
                     }
 
-                    NextButton(
-                        enabled = canGoNext,
-                        isFinalStep = currentStepIndex >= stepMeta.lastIndex,
-                        onClick = { nextScreen() },
+                    Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
                             .padding(bottom = 16.dp)
-                    )
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (skipAction != null) {
+                            SkipButton(
+                                label = skipLabel ?: "Skip",
+                                onClick = { skipAction?.invoke() }
+                            )
+                        }
+                        NextButton(
+                            enabled = canGoNext,
+                            isFinalStep = currentStepIndex >= stepMeta.lastIndex,
+                            onClick = { nextScreen() }
+                        )
+                    }
                     setupAiPrompt?.let { prompt ->
                         ManagerAssistantDialog(
                             context = setupContext,
@@ -557,9 +593,63 @@ class SetupActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun SkipButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    val skin = LocalPurrfectSkin.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val gradient = Brush.horizontalGradient(
+        listOf(
+            skin.glowSecondary,
+            skin.glowPrimary
+        )
+    )
+    val contentColor = if (skin.glowPrimary.luminance() > 0.5f) Color.Black.copy(alpha = 0.85f) else Color.White
+    val buttonShape = if (skin.id == "AETHER") G2RoundedRectangle(36.dp) else RoundedCornerShape(36.dp)
+    
+    Surface(
+        modifier = Modifier
+            .scaleOnPress(interactionSource)
+            .clip(buttonShape)
+            .border(
+                width = 1.dp,
+                color = skin.textPrimary.copy(alpha = 0.24f),
+                shape = buttonShape
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick() },
+        color = Color.Transparent
+    ) {
+        Box(
+            modifier = Modifier
+                .background(gradient)
+                .padding(horizontal = 24.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = contentColor,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp
+            )
+        }
+    }
+}
+
 private fun SetupScreen.meta(context: RemoteSideContext): SetupStepMeta {
     val translation = context.translation
     return when (this) {
+        is ThemeSelectorScreen -> SetupStepMeta(
+            route = route,
+            title = "App Theme",
+            subtitle = "Choose your Aphelion skin",
+            icon = Icons.Filled.Palette
+        )
+
         is PickLanguageScreen -> SetupStepMeta(
             route = route,
             title = translation["setup.dialogs.select_language"],
@@ -621,6 +711,7 @@ private fun SetupScreen.meta(context: RemoteSideContext): SetupStepMeta {
 
 @Composable
 private fun SetupAuroraBackground() {
+    val skin = LocalPurrfectSkin.current
     val infiniteTransition = rememberInfiniteTransition(label = "setupAurora")
     val driftX by infiniteTransition.animateFloat(
         initialValue = -90f,
@@ -644,15 +735,15 @@ private fun SetupAuroraBackground() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(PurrfectPalette.backgroundGradient)
+            .background(skin.backgroundGradient)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val primaryGlow = PurrfectPalette.glowPrimary.copy(alpha = 0.36f)
-            val secondaryGlow = PurrfectPalette.glowSecondary.copy(alpha = 0.28f)
+            val primaryGlow = skin.glowPrimary.copy(alpha = 0.36f)
+            val secondaryGlow = skin.glowSecondary.copy(alpha = 0.28f)
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.06f),
+                        skin.textPrimary.copy(alpha = 0.06f),
                         Color.Transparent
                     ),
                     start = Offset(x = size.width * 0.15f, y = 0f),
@@ -663,7 +754,7 @@ private fun SetupAuroraBackground() {
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        PurrfectPalette.glowPrimary.copy(alpha = 0.12f),
+                        skin.glowPrimary.copy(alpha = 0.12f),
                         Color.Transparent
                     ),
                     start = Offset(x = 0f, y = size.height * 0.72f),
@@ -677,22 +768,25 @@ private fun SetupAuroraBackground() {
 
 @Composable
 private fun SetupTopBar(onAskAi: () -> Unit) {
+    val skin = LocalPurrfectSkin.current
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val contentColor = if (skin.isDark) Color.White else Color.Black.copy(alpha = 0.85f)
+    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 12.dp)
             .padding(top = topPadding),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.White.copy(alpha = 0.07f),
+        shape = if (skin.id == "AETHER") G2RoundedRectangle(28.dp) else RoundedCornerShape(28.dp),
+        color = skin.glassSurface,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             Brush.linearGradient(
                 listOf(
-                    PurrfectPalette.glowPrimary.copy(alpha = 0.6f),
-                    PurrfectPalette.glowSecondary.copy(alpha = 0.45f)
+                    skin.glowPrimary.copy(alpha = 0.6f),
+                    skin.glowSecondary.copy(alpha = 0.45f)
                 )
             )
         )
@@ -706,15 +800,15 @@ private fun SetupTopBar(onAskAi: () -> Unit) {
         ) {
             Text(
                 text = "Purrfect",
-                color = PurrfectPalette.textPrimary,
+                color = skin.textPrimary,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 18.sp,
                 modifier = Modifier.weight(1f)
             )
             Surface(
                 shape = RoundedCornerShape(40),
-                color = Color.White.copy(alpha = 0.08f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                color = skin.textPrimary.copy(alpha = 0.08f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, skin.textPrimary.copy(alpha = 0.14f))
             ) {
                 Row(
                     modifier = Modifier
@@ -724,10 +818,14 @@ private fun SetupTopBar(onAskAi: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Filled.SmartToy, contentDescription = null, tint = Color.White)
+                    Icon(
+                        imageVector = Icons.Filled.SmartToy,
+                        contentDescription = null,
+                        tint = contentColor
+                    )
                     Text(
                         text = "Ask AI",
-                        color = Color.White,
+                        color = contentColor,
                         fontWeight = FontWeight.Medium,
                         fontSize = 13.sp
                     )
@@ -743,7 +841,10 @@ private fun SetupHeader(
     currentIndex: Int,
     total: Int
 ) {
+    val skin = LocalPurrfectSkin.current
     val translation = SharedContextHolder.remote(LocalContext.current).translation
+    val contentColor = if (skin.isDark) Color.White else Color.Black.copy(alpha = 0.85f)
+    
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -755,8 +856,8 @@ private fun SetupHeader(
         ) {
             Surface(
                 shape = RoundedCornerShape(30),
-                color = Color.White.copy(alpha = 0.08f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                color = skin.textPrimary.copy(alpha = 0.08f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, skin.textPrimary.copy(alpha = 0.14f))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -766,7 +867,7 @@ private fun SetupHeader(
                     Icon(
                         imageVector = Icons.Filled.Flag,
                         contentDescription = null,
-                        tint = Color.White
+                        tint = skin.glowPrimary
                     )
                     Text(
                         text = translation.format(
@@ -774,7 +875,7 @@ private fun SetupHeader(
                             "current" to (currentIndex + 1).toString(),
                             "total" to total.toString()
                         ),
-                        color = Color.White,
+                        color = contentColor,
                         fontWeight = FontWeight.Medium,
                         fontSize = 13.sp
                     )
@@ -782,8 +883,8 @@ private fun SetupHeader(
             }
             Surface(
                 shape = RoundedCornerShape(30),
-                color = PurrfectPalette.glowPrimary.copy(alpha = 0.16f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, PurrfectPalette.glowPrimary.copy(alpha = 0.35f))
+                color = skin.glowPrimary.copy(alpha = 0.16f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, skin.glowPrimary.copy(alpha = 0.35f))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -793,11 +894,11 @@ private fun SetupHeader(
                     Icon(
                         imageVector = currentStep.icon,
                         contentDescription = null,
-                        tint = Color.White
+                        tint = skin.glowPrimary
                     )
                     Text(
                         text = currentStep.title,
-                        color = Color.White,
+                        color = contentColor,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
                         maxLines = 1,
@@ -813,6 +914,7 @@ private enum class StepState { COMPLETE, ACTIVE, UPCOMING }
 
 @Composable
 private fun StepBadgesRow(steps: List<SetupStepMeta>, currentStep: Int) {
+    val skin = LocalPurrfectSkin.current
     Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -833,12 +935,12 @@ private fun StepBadgesRow(steps: List<SetupStepMeta>, currentStep: Int) {
                         .background(
                             Brush.horizontalGradient(
                                 listOf(
-                                    Color.White.copy(alpha = 0.05f),
-                                    PurrfectPalette.glowPrimary.copy(alpha = 0.4f),
-                                    Color.White.copy(alpha = 0.05f)
+                                    skin.textPrimary.copy(alpha = 0.05f),
+                                    skin.glowPrimary.copy(alpha = 0.4f),
+                                    skin.textPrimary.copy(alpha = 0.05f)
                                 )
                             ),
-                            shape = RoundedCornerShape(20.dp)
+                            shape = if (skin.id == "AETHER") G2RoundedRectangle(20.dp) else RoundedCornerShape(20.dp)
                         )
                 )
             }
@@ -848,19 +950,20 @@ private fun StepBadgesRow(steps: List<SetupStepMeta>, currentStep: Int) {
 
 @Composable
 private fun StepBadge(step: SetupStepMeta, state: StepState) {
+    val skin = LocalPurrfectSkin.current
     val translation = SharedContextHolder.remote(LocalContext.current).translation
     val baseColor = when (state) {
-        StepState.COMPLETE -> PurrfectPalette.glowSecondary
-        StepState.ACTIVE -> PurrfectPalette.glowPrimary
-        StepState.UPCOMING -> Color.White.copy(alpha = 0.35f)
+        StepState.COMPLETE -> skin.glowSecondary
+        StepState.ACTIVE -> skin.glowPrimary
+        StepState.UPCOMING -> skin.textPrimary.copy(alpha = 0.35f)
     }
     val background = when (state) {
-        StepState.UPCOMING -> Color.White.copy(alpha = 0.05f)
-        StepState.COMPLETE -> Color.White.copy(alpha = 0.08f)
-        StepState.ACTIVE -> Color.White.copy(alpha = 0.12f)
+        StepState.UPCOMING -> skin.textPrimary.copy(alpha = 0.05f)
+        StepState.COMPLETE -> skin.textPrimary.copy(alpha = 0.08f)
+        StepState.ACTIVE -> skin.textPrimary.copy(alpha = 0.12f)
     }
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = if (skin.id == "AETHER") G2RoundedRectangle(18.dp) else RoundedCornerShape(18.dp),
         color = background,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -882,7 +985,7 @@ private fun StepBadge(step: SetupStepMeta, state: StepState) {
                     Icon(
                         imageVector = step.icon,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = if (state == StepState.UPCOMING) skin.textPrimary.copy(alpha = 0.5f) else skin.textPrimary,
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
@@ -893,7 +996,7 @@ private fun StepBadge(step: SetupStepMeta, state: StepState) {
             ) {
                 Text(
                     text = step.title,
-                    color = Color.White,
+                    color = skin.textPrimary,
                     fontWeight = if (state == StepState.ACTIVE) FontWeight.Bold else FontWeight.SemiBold,
                     fontSize = 14.sp,
                     maxLines = 1,
@@ -906,7 +1009,7 @@ private fun StepBadge(step: SetupStepMeta, state: StepState) {
                 }
                 Text(
                     text = hint,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = skin.textSecondary.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )
             }
@@ -916,18 +1019,19 @@ private fun StepBadge(step: SetupStepMeta, state: StepState) {
 
 @Composable
 private fun SetupProgressBar(progress: Float) {
+    val skin = LocalPurrfectSkin.current
     val gradient = Brush.horizontalGradient(
         listOf(
-            PurrfectPalette.glowSecondary,
-            PurrfectPalette.glowPrimary
+            skin.glowSecondary,
+            skin.glowPrimary
         )
     )
     Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White.copy(alpha = 0.07f),
+        shape = if (skin.id == "AETHER") G2RoundedRectangle(18.dp) else RoundedCornerShape(18.dp),
+        color = skin.textPrimary.copy(alpha = 0.08f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            Color.White.copy(alpha = 0.14f)
+            skin.textPrimary.copy(alpha = 0.12f)
         )
     ) {
         Box(
@@ -950,16 +1054,18 @@ private fun SetupContentCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val skin = LocalPurrfectSkin.current
+    val cardShape = if (skin.id == "AETHER") G2RoundedRectangle(34.dp) else RoundedCornerShape(34.dp)
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(34.dp),
-        color = Color.White.copy(alpha = 0.04f),
+        shape = cardShape,
+        color = if (skin.id == "AETHER") skin.cardOverlayColor else skin.glassSurface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             Brush.linearGradient(
                 listOf(
-                    PurrfectPalette.glowPrimary.copy(alpha = 0.45f),
-                    PurrfectPalette.glowSecondary.copy(alpha = 0.35f)
+                    skin.glowPrimary.copy(alpha = 0.45f),
+                    skin.glowSecondary.copy(alpha = 0.35f)
                 )
             )
         ),
@@ -968,18 +1074,7 @@ private fun SetupContentCard(
     ) {
         Box(
             modifier = Modifier
-                .background(PurrfectPalette.cardOverlay)
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.06f),
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.06f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(34.dp)
-                )
+                .background(if (skin.id == "AETHER") skin.cardOverlayColor else skin.cardOverlayColor.copy(alpha = 0.28f))
                 .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
             content()
@@ -994,15 +1089,22 @@ private fun NextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val skin = LocalPurrfectSkin.current
     val translation = SharedContextHolder.remote(LocalContext.current).translation
     val alpha by animateFloatAsState(targetValue = if (enabled) 1f else 0.6f, label = "NextButtonAlpha")
     val gradient = Brush.horizontalGradient(
         listOf(
-            PurrfectPalette.glowSecondary,
-            PurrfectPalette.glowPrimary
+            skin.glowSecondary,
+            skin.glowPrimary
         )
     )
     val interactionSource = remember { MutableInteractionSource() }
+    val contentColor = if (enabled) {
+        if (skin.glowPrimary.luminance() > 0.5f) Color.Black.copy(alpha = 0.85f) else Color.White
+    } else {
+        if (skin.isDark) Color.White else Color.Black.copy(alpha = 0.85f)
+    }
+    
     Surface(
         modifier = modifier
             .alpha(alpha)
@@ -1010,7 +1112,7 @@ private fun NextButton(
             .clip(RoundedCornerShape(36.dp))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.24f),
+                color = skin.textPrimary.copy(alpha = 0.24f),
                 shape = RoundedCornerShape(36.dp)
             )
             .clickable(
@@ -1018,11 +1120,11 @@ private fun NextButton(
                 interactionSource = interactionSource,
                 indication = null
             ) { onClick() },
-        color = Color.White.copy(alpha = if (enabled) 0.07f else 0.03f)
+        color = Color.Transparent
     ) {
         Box(
             modifier = Modifier
-                .background(if (enabled) gradient else Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.08f))))
+                .background(if (enabled) gradient else SolidColor(skin.textPrimary.copy(alpha = 0.08f)))
                 .padding(horizontal = 24.dp, vertical = 14.dp)
         ) {
             Row(
@@ -1035,17 +1137,19 @@ private fun NextButton(
                     } else {
                         translation["setup.activity.continue_button"]
                     },
-                    color = Color.White,
+                    color = contentColor,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp
                 )
                 Icon(
                     imageVector = if (isFinalStep) Icons.Filled.Check else Icons.AutoMirrored.Filled.ArrowForwardIos,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = contentColor,
                     modifier = Modifier.size(22.dp)
                 )
             }
         }
     }
 }
+}
+

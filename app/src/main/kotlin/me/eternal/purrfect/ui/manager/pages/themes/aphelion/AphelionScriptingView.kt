@@ -9,12 +9,14 @@ import androidx.navigation.NavBackStackEntry
 import androidx.documentfile.provider.DocumentFile
 import me.eternal.purrfect.common.ui.rememberAsyncMutableState
 import me.eternal.purrfect.ui.manager.pages.scripting.ScriptingRootSection
-import me.eternal.purrfect.ui.manager.theme.PurrfectPalette
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import me.eternal.purrfect.common.ui.theme.PurrfectPalette
 import me.eternal.purrfect.common.util.ktx.openLink
 import kotlinx.coroutines.launch
 
 @Composable
 fun ScriptingRootSection.AphelionScriptingScreen(nav: NavBackStackEntry) {
+    val skin = LocalPurrfectSkin.current
     val scriptingFolder by rememberAsyncMutableState(
         defaultValue = null,
         updateDispatcher = reloadDispatcher
@@ -43,7 +45,7 @@ fun ScriptingRootSection.AphelionScriptingScreen(nav: NavBackStackEntry) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PurrfectPalette.backgroundGradient)
+            .background(skin.backgroundGradient)
     ) {
         ScriptingHeader(
             titles = tabTitles,

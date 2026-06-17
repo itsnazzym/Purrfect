@@ -2,23 +2,11 @@ package me.eternal.purrfect.core.features.impl.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,14 +14,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import me.eternal.purrfect.common.ui.PurrfectOverlayPalette
+import me.eternal.purrfect.common.ui.theme.LocalPurrfectSkin
+import me.eternal.purrfect.core.ui.PurrfectOverlayTheme
+import me.eternal.purrfect.core.util.ktx.vibrateLongPress
 import kotlin.math.roundToInt
 
-/**
- * Composable dialog for jumping to a specific snap in the story (Auto Skip).
- * Matches SnapEnhance dialog size (75% width), transparency (0.88), and layout.
- * Styled with Purrfect colors.
- */
 @Composable
 fun OperaStorySnapJumpDialog(
     currentIndex: Int,
@@ -42,99 +27,116 @@ fun OperaStorySnapJumpDialog(
     onJump: (Int) -> Unit
 ) {
     var sliderValue by remember { mutableFloatStateOf((currentIndex + 1).toFloat()) }
-    val selectedSnap = sliderValue.roundToInt()
+    val selectedSnap = sliderValue.roundToInt().coerceIn(1, totalCount)
 
     Dialog(onDismissRequest = onDismiss) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.75f)
-                .background(
-                    color = PurrfectOverlayPalette.cardOverlayColor.copy(alpha = 0.88f),
-                    shape = RoundedCornerShape(24.dp)
-                )
-                .padding(20.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+        PurrfectOverlayTheme(null) {
+            val skin = LocalPurrfectSkin.current
+            val context = androidx.compose.ui.platform.LocalContext.current
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.75f)
+                    .background(
+                        brush = skin.cardOverlay,
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .padding(20.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.Center
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "$selectedSnap",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PurrfectOverlayPalette.textPrimary
-                    )
-                    Text(
-                        text = " / $totalCount",
-                        fontSize = 14.sp,
-                        color = PurrfectOverlayPalette.textSecondary,
-                        modifier = Modifier.padding(bottom = 5.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Slider(
-                    value = sliderValue,
-                    onValueChange = { sliderValue = it },
-                    valueRange = 1f..totalCount.toFloat(),
-                    steps = if (totalCount > 2) totalCount - 2 else 0,
-                    colors = SliderDefaults.colors(
-                        thumbColor = PurrfectOverlayPalette.glowPrimary,
-                        activeTrackColor = PurrfectOverlayPalette.glowPrimary,
-                        activeTickColor = Color.Transparent,
-                        inactiveTrackColor = PurrfectOverlayPalette.textPrimary.copy(alpha = 0.12f),
-                        inactiveTickColor = Color.Transparent
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(
-                                color = Color.White.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { onDismiss() }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Cancel",
-                            fontSize = 13.sp,
-                            color = PurrfectOverlayPalette.textSecondary
+                            text = "$selectedSnap",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = skin.textPrimary
+                        )
+                        Text(
+                            text = " / $totalCount",
+                            fontSize = 14.sp,
+                            color = skin.textSecondary,
+                            modifier = Modifier.padding(bottom = 5.dp)
                         )
                     }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(
-                                color = PurrfectOverlayPalette.glowPrimary.copy(alpha = 0.9f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable {
-                                onDismiss()
-                                onJump(selectedSnap - 1)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { newValue ->
+                            val snapped = newValue.roundToInt().toFloat()
+                            if (snapped != sliderValue) {
+                                context.vibrateLongPress()
+                                sliderValue = snapped
                             }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
+                        },
+                        valueRange = 1f..totalCount.toFloat(),
+                        steps = if (totalCount > 2) totalCount - 2 else 0,
+                        colors = SliderDefaults.colors(
+                            thumbColor = skin.glowPrimary,
+                            activeTrackColor = skin.glowPrimary,
+                            activeTickColor = Color.Transparent,
+                            inactiveTrackColor = skin.textPrimary.copy(alpha = 0.12f),
+                            inactiveTickColor = Color.Transparent
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "Go",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        // Cancel Button (Secondary - Left)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = skin.textPrimary.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable { 
+                                    context.vibrateLongPress()
+                                    onDismiss() 
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                fontSize = 13.sp,
+                                color = skin.textSecondary
+                            )
+                        }
+                        // Go Button (Primary - Right)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = skin.glowPrimary.copy(alpha = 0.9f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    context.vibrateLongPress()
+                                    onDismiss()
+                                    onJump(selectedSnap - 1)
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Go",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = skin.cardOverlayColor
+                            )
+                        }
                     }
                 }
             }

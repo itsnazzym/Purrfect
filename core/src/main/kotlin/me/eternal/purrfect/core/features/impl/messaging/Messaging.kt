@@ -41,6 +41,7 @@ class Messaging : Feature("Messaging") {
 
     private val feedCachedSnapMessages = EvictingMap<String, List<Long>>(100)
     private val conversationManagerReadyListeners = mutableListOf<() -> Unit>()
+    private val openedSnaps = java.util.ArrayDeque<String>(200)
 
     fun onConversationManagerReady(listener: () -> Unit) {
         synchronized(conversationManagerReadyListeners) {
@@ -91,6 +92,20 @@ class Messaging : Feature("Messaging") {
     override fun init() {
         val stealthMode = context.feature(StealthMode::class)
         val hideTypingIndicator = context.feature(HideTypingIndicator::class)
+
+        // ANCHOR: Persistent Conversation Focus Hook
+        context.mappings.useMapper(FriendsFeedEventDispatcherMapper::class) {
+            classReference.getAsClass()?.hook("onItemLongPress", HookStage.BEFORE) { param ->
+                val viewItemContainer = param.arg<Any>(0)
+                val viewItem = viewItemContainer.getObjectField(viewModelField.get()!!).toString()
+                val conversationId = viewItem.substringAfter("conversationId: ").substring(0, 36).also {
+                    if (it.startsWith("null")) return@hook
+                }
+                lastFocusedConversationId = conversationId
+                lastFocusedConversationType = context.database.getConversationType(conversationId) ?: 0
+                context.log.verbose("Captured Focus: $conversationId")
+            }
+        }
 
         context.classCache.conversationManager.hookConstructor(HookStage.BEFORE) { param ->
             synchronized(conversationManagerReadyListeners) {
@@ -270,21 +285,8 @@ class Messaging : Feature("Messaging") {
                     lastFocusedMessageId = param.arg(1)
                 }
             }
-        }
 
-        onNextActivityCreate {
-            context.mappings.useMapper(FriendsFeedEventDispatcherMapper::class) {
-                classReference.getAsClass()?.hook("onItemLongPress", HookStage.BEFORE) { param ->
-                    val viewItemContainer = param.arg<Any>(0)
-                    val viewItem = viewItemContainer.getObjectField(viewModelField.get()!!).toString()
-                    val conversationId = viewItem.substringAfter("conversationId: ").substring(0, 36).also {
-                        if (it.startsWith("null")) return@hook
-                    }
-                    lastFocusedConversationId = conversationId
-                    lastFocusedConversationType = context.database.getConversationType(conversationId) ?: 0
-                }
-            }
-
+            // Extraction loop: Direct access to avoid creating expensive Message wrappers (JNI memory fix)
             context.classCache.feedEntry.hookConstructor(HookStage.AFTER) { param ->
                 val instance = param.thisObject<Any>()
                 val interactionInfo = instance.getObjectFieldOrNull("mInteractionInfo") ?: return@hookConstructor
@@ -293,9 +295,14 @@ class Messaging : Feature("Messaging") {
                 val conversationId = SnapUUID(conversationIdObject).toString()
                 
                 val myUserId = context.database.myUserId
-                val myUserIdBytes = runCatching { UUID.fromString(myUserId).toBytes() }.getOrNull()
+                val myUserIdBytes = runCatching { 
+                    val uuid = UUID.fromString(myUserId)
+                    val bb = java.nio.ByteBuffer.wrap(ByteArray(16))
+                    bb.putLong(uuid.mostSignificantBits)
+                    bb.putLong(uuid.leastSignificantBits)
+                    bb.array()
+                }.getOrNull()
                 
-                // Extraction loop: Direct access to avoid creating expensive Message wrappers (JNI memory fix)
                 val unreadIds = mutableListOf<Pair<Long, Long>>() // orderKey to messageId
                 for (nativeMsg in nativeMessages) {
                     if (nativeMsg == null) continue
@@ -323,7 +330,9 @@ class Messaging : Feature("Messaging") {
 
                 feedCachedSnapMessages[conversationId] = unreadIds.sortedBy { it.first }.map { it.second }
             }
+        }
 
+        onNextActivityCreate {
             context.classCache.conversationManager.apply {
                 hook("enterConversation", HookStage.BEFORE) { param ->
                     openedConversationUUID = SnapUUID(param.arg(0))
